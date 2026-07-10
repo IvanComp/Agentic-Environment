@@ -1,0 +1,89 @@
+{
+  "overall": {
+    "n": 6,
+    "question_count": 2,
+    "accuracy": 1.0,
+    "mean_elapsed_s": 0.00123759733105544,
+    "mean_total_tokens": 905.5
+  },
+  "by_benchmark_mechanism": [
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "debate",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 0.0015815419901628047,
+      "mean_total_tokens": 1259,
+      "mean_prompt_tokens": 1119,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 1
+    },
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "role",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 0.0009165829978883266,
+      "mean_total_tokens": 811,
+      "mean_prompt_tokens": 671,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0
+    },
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "voting",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 0.0010748339991550893,
+      "mean_total_tokens": 665,
+      "mean_prompt_tokens": 525,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0
+    },
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "debate",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 0.001587916980497539,
+      "mean_total_tokens": 1247,
+      "mean_prompt_tokens": 1107,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 1
+    },
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "role",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 0.0009822080028243363,
+      "mean_total_tokens": 798,
+      "mean_prompt_tokens": 658,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0
+    },
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "voting",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 0.001282500015804544,
+      "mean_total_tokens": 653,
+      "mean_prompt_tokens": 513,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0
+    }
+  ]
+}

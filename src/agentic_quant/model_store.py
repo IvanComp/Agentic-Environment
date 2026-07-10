@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+from typing import Callable
+from urllib.request import Request, urlopen
+
+from .model_registry import get_model_preset
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODELS_DIR = PROJECT_ROOT / "models"
+
+ProgressCallback = Callable[[int, int], None]
+
+
+def model_file_paths(model_key: str) -> list[Path]:
+    preset = get_model_preset(model_key)
+    if not preset.filenames:
+        return [MODELS_DIR / model_key]
+    return [MODELS_DIR / model_key / filename for filename in preset.filenames]
+
+
+def model_path(model_key: str) -> Path:
+    return model_file_paths(model_key)[0]
+
+
+def model_status(model_key: str) -> dict:
+    preset = get_model_preset(model_key)
+    if model_key == "demo":
+        return {
+            **preset.to_dict(),
+            "downloaded": True,
+            "path": "",
+            "file_count": 0,
+            "files": [],
+            "bytes_downloaded": 0,
+            "bytes_total": 0,
+            "percent": 100,
+        }
+
+    paths = model_file_paths(model_key)
+    file_statuses = [
+        {
+            "filename": path.name,
+            "path": str(path),
+            "exists": path.exists(),
+            "bytes": path.stat().st_size if path.exists() else 0,
+        }
+        for path in paths
+    ]
+    downloaded_bytes = sum(file_status["bytes"] for file_status in file_statuses)
+    total = preset.expected_bytes or downloaded_bytes
+    downloaded = all(file_status["exists"] for file_status in file_statuses) and (
+        preset.expected_bytes == 0 or downloaded_bytes == preset.expected_bytes
+    )
+    percent = 0 if not total else min(100, round(downloaded_bytes / total * 100, 1))
+    return {
+        **preset.to_dict(),
+        "downloaded": downloaded,
+        "path": str(paths[0]),
+        "file_count": len(paths),
+        "files": file_statuses,
+        "bytes_downloaded": downloaded_bytes,
+        "bytes_total": total,
+        "percent": percent,
+    }
+
+
+def selected_models_status(model_keys: list[str]) -> list[dict]:
+    seen: set[str] = set()
+    statuses = []
+    for key in model_keys:
+        if key in seen:
+            continue
+        seen.add(key)
+        statuses.append(model_status(key))
+    return statuses
+
+
+def missing_model_keys(model_keys: list[str]) -> list[str]:
+    return [status["key"] for status in selected_models_status(model_keys) if not status["downloaded"]]
+
+
+def ensure_models(model_keys: list[str], *, download: bool, progress: Callable[[str, int, int], None] | None = None) -> None:
+    missing = missing_model_keys(model_keys)
+    if missing and not download:
+        labels = ", ".join(get_model_preset(key).label for key in missing)
+        raise RuntimeError(
+            "Models not downloaded: "
+            f"{labels}. Download them from the UI or rerun with --download-model."
+        )
+    for key in missing:
+        download_model(key, progress=None if progress is None else lambda done, total, model_key=key: progress(model_key, done, total))
+
+
+def download_model(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
+    preset = get_model_preset(model_key)
+    if model_key == "demo":
+        return model_path(model_key)
+    if not preset.download_urls:
+        raise ValueError(f"Model {model_key} does not define a download URL.")
+
+    final_paths = model_file_paths(model_key)
+    status = model_status(model_key)
+    if status["downloaded"]:
+        if progress:
+            progress(status["bytes_total"], status["bytes_total"])
+        return final_paths[0]
+
+    final_paths[0].parent.mkdir(parents=True, exist_ok=True)
+    completed_bytes = 0
+    expected_total = preset.expected_bytes
+
+    for url, final_path in zip(preset.download_urls, final_paths, strict=True):
+        tmp_path = final_path.with_suffix(final_path.suffix + ".part")
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+        request = Request(url, headers={"User-Agent": "agentic-quant/0.1"})
+        with urlopen(request, timeout=60) as response:
+            file_total = _content_length(response)
+            total_for_progress = expected_total or completed_bytes + file_total
+            downloaded = 0
+            with tmp_path.open("wb") as handle:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
+                    downloaded += len(chunk)
+                    if progress:
+                        progress(completed_bytes + downloaded, total_for_progress)
+
+        if final_path.exists():
+            final_path.unlink()
+        shutil.move(str(tmp_path), final_path)
+        completed_bytes += final_path.stat().st_size
+
+    actual_size = sum(path.stat().st_size for path in final_paths if path.exists())
+    if expected_total and actual_size != expected_total:
+        raise RuntimeError(
+            f"Incomplete download for {preset.label}: {actual_size} bytes instead of {expected_total}."
+        )
+    if progress:
+        progress(actual_size, expected_total or actual_size)
+    return final_paths[0]
+
+
+def _content_length(response) -> int:
+    header_value = response.headers.get("Content-Length")
+    if header_value and header_value.isdigit():
+        return int(header_value)
+    return 0

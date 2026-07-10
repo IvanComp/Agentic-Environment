@@ -1,0 +1,39 @@
+{
+  "created_at": "2026-07-10T09:28:44.056142+00:00",
+  "model_key": "demo",
+  "model_label": "Demo",
+  "agent_model_keys": [
+    "demo",
+    "demo",
+    "demo"
+  ],
+  "agent_model_labels": [
+    "Demo",
+    "Demo",
+    "Demo"
+  ],
+  "download_model": true,
+  "n_ctx": 2048,
+  "benchmarks": [
+    "gsm8k_mini",
+    "aqua_rat_mini"
+  ],
+  "mechanisms": [
+    "voting",
+    "role",
+    "debate"
+  ],
+  "limit": null,
+  "benchmark_limits": {
+    "gsm8k_mini": 1,
+    "aqua_rat_mini": 1
+  },
+  "debate_rounds": 2,
+  "voting_tie_breaker": "confidence",
+  "agent_count": 3,
+  "agent_roles": [
+    "planner",
+    "solver",
+    "critic"
+  ]
+}

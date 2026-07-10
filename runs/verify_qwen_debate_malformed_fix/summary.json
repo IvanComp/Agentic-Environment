@@ -1,0 +1,24 @@
+{
+  "overall": {
+    "n": 1,
+    "question_count": 1,
+    "accuracy": 0.0,
+    "mean_elapsed_s": 12.29259695802466,
+    "mean_total_tokens": 1740
+  },
+  "by_benchmark_mechanism": [
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "debate",
+      "n": 1,
+      "accuracy": 0.0,
+      "mean_elapsed_s": 12.29259695802466,
+      "mean_total_tokens": 1740,
+      "mean_prompt_tokens": 1511,
+      "mean_completion_tokens": 229,
+      "mean_agreement": 0.6666666666666666,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 2
+    }
+  ]
+}

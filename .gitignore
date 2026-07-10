@@ -1,0 +1,10 @@
+models/
+.DS_Store
+.agentic_quant_ui.pid
+.venv/
+models/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+*.log

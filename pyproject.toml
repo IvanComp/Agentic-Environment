@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-quant"
+version = "0.1.0"
+description = "Lightweight multi-agent framework for quantitative benchmark analysis."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Codex" }]
+dependencies = []
+
+[project.optional-dependencies]
+analysis = ["pandas>=2.0", "matplotlib>=3.7", "notebook>=7.0"]
+llm = ["llama-cpp-python>=0.2.90"]
+gguf = ["llama-cpp-python>=0.2.90"]
+
+[project.scripts]
+agentic-quant = "agentic_quant.run_benchmark:main"
+agentic-quant-ui = "agentic_quant.web_ui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agentic_quant = ["data/*.jsonl"]

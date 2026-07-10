@@ -1,0 +1,24 @@
+{
+  "overall": {
+    "n": 1,
+    "question_count": 1,
+    "accuracy": 0.0,
+    "mean_elapsed_s": 0.0009032079833559692,
+    "mean_total_tokens": 569
+  },
+  "by_benchmark_mechanism": [
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "voting",
+      "n": 1,
+      "accuracy": 0.0,
+      "mean_elapsed_s": 0.0009032079833559692,
+      "mean_total_tokens": 569,
+      "mean_prompt_tokens": 429,
+      "mean_completion_tokens": 140,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0
+    }
+  ]
+}
