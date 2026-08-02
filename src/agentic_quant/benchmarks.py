@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
+from functools import lru_cache
 from importlib import resources
 from typing import Any
 
@@ -45,6 +46,15 @@ BENCHMARK_INFO = {
 def load_benchmark(name: str, *, limit: int | None = None) -> list[BenchmarkItem]:
     if name not in available_benchmarks():
         raise ValueError(f"Unknown benchmark {name!r}. Available: {', '.join(available_benchmarks())}")
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be at least 1 when provided")
+    items = _load_benchmark_items(name)
+    return list(items if limit is None else items[:limit])
+
+
+@lru_cache(maxsize=None)
+def _load_benchmark_items(name: str) -> tuple[BenchmarkItem, ...]:
+    """Load immutable packaged data once instead of reopening it for every UI poll."""
     filename = f"{name}.jsonl"
     items: list[BenchmarkItem] = []
     with resources.files("agentic_quant.data").joinpath(filename).open("r", encoding="utf-8") as handle:
@@ -62,9 +72,7 @@ def load_benchmark(name: str, *, limit: int | None = None) -> list[BenchmarkItem
                     metadata=raw.get("metadata") or {},
                 )
             )
-            if limit and len(items) >= limit:
-                break
-    return items
+    return tuple(items)
 
 
 def load_many(names: list[str], *, limit: int | None = None) -> list[BenchmarkItem]:

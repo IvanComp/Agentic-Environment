@@ -7,8 +7,9 @@ from fractions import Fraction
 from typing import Any
 
 
-_NUMBER_RE = re.compile(r"-?\d+(?:,\d{3})*(?:\.\d+)?")
-_ANSWER_VALUE_RE = re.compile(r"-?\d+(?:,\d{3})*(?:\.\d+)?(?:\s*/\s*-?\d+(?:,\d{3})*(?:\.\d+)?)?%?")
+_NUMBER_PATTERN = r"[+-]?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?"
+_NUMBER_RE = re.compile(_NUMBER_PATTERN)
+_ANSWER_VALUE_RE = re.compile(rf"{_NUMBER_PATTERN}(?:\s*/\s*{_NUMBER_PATTERN})?%?")
 _RATIONALE_KEYS = ("rationale", "rational", "reasoning", "explanation")
 
 
@@ -20,6 +21,8 @@ def estimate_tokens(text: str) -> int:
 
 
 def format_number(value: float) -> str:
+    if not math.isfinite(value):
+        return str(value).lower()
     if abs(value - round(value)) < 1e-9:
         return str(int(round(value)))
     return f"{value:.6f}".rstrip("0").rstrip(".")
@@ -33,14 +36,14 @@ def extract_numbers(text: str) -> list[float]:
 
 
 def try_parse_json(text: str) -> dict[str, Any] | None:
-    text = text.strip()
-    candidates = [text]
+    text = str(text).strip()
+    if not text:
+        return None
+    candidates: list[str] = []
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.S | re.I)
     if fenced:
-        candidates.insert(0, fenced.group(1).strip())
-    obj = re.search(r"\{.*\}", text, flags=re.S)
-    if obj:
-        candidates.insert(0, obj.group(0))
+        candidates.append(fenced.group(1).strip())
+    candidates.append(text)
     for candidate in candidates:
         try:
             parsed = json.loads(candidate)
@@ -48,7 +51,40 @@ def try_parse_json(text: str) -> dict[str, Any] | None:
             continue
         if isinstance(parsed, dict):
             return parsed
-    return None
+
+    # raw_decode handles a valid object surrounded by explanatory prose and,
+    # unlike a greedy ``{.*}`` regex, correctly respects braces in JSON strings.
+    # For list-shaped output, skip the leading peer-context array before scanning
+    # so an embedded peer object is never attributed to the current agent.
+    decoder = json.JSONDecoder()
+    scan_text = text
+    leading_whitespace = len(text) - len(text.lstrip())
+    if text.lstrip().startswith("["):
+        try:
+            _, list_end = decoder.raw_decode(text, leading_whitespace)
+        except json.JSONDecodeError:
+            return None
+        scan_text = text[list_end:]
+    parsed_objects: list[dict[str, Any]] = []
+    for match in re.finditer(r"\{", scan_text):
+        try:
+            parsed, _ = decoder.raw_decode(scan_text, match.start())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            parsed_objects.append(parsed)
+    if not parsed_objects:
+        return None
+    _, best = max(
+        enumerate(parsed_objects),
+        key=lambda item: (
+            int("answer" in item[1]),
+            int(any(key in item[1] for key in _RATIONALE_KEYS)),
+            int("confidence" in item[1]),
+            item[0],
+        ),
+    )
+    return best
 
 
 def extract_answer_candidate(text: Any, choices: dict[str, str] | None = None) -> str:
@@ -175,7 +211,11 @@ def normalize_answer(answer: Any) -> str:
     if parsed and "answer" in parsed:
         return normalize_answer(parsed["answer"])
 
-    explicit = re.search(r"(?:final\s*)?answer\s*[:=]\s*([A-E]|-?\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?%?)", text, flags=re.I)
+    explicit = re.search(
+        rf"(?:final\s*)?answer\s*[:=]\s*([A-E]|{_NUMBER_PATTERN}(?:\s*/\s*{_NUMBER_PATTERN})?%?)",
+        text,
+        flags=re.I,
+    )
     if explicit:
         return normalize_answer(explicit.group(1))
 
@@ -185,15 +225,19 @@ def normalize_answer(answer: Any) -> str:
 
     text = text.replace("$", "").replace(",", "").strip()
     text = re.sub(r"\s+", " ", text)
-    if re.fullmatch(r"-?\d+(?:\.\d+)?%", text):
+    if re.fullmatch(rf"{_NUMBER_PATTERN}%", text):
         return format_number(float(text[:-1]))
-    if re.fullmatch(r"-?\d+(?:\.\d+)?/-?\d+(?:\.\d+)?", text):
+    fraction = re.fullmatch(rf"({_NUMBER_PATTERN})\s*/\s*({_NUMBER_PATTERN})", text)
+    if fraction:
         try:
-            return format_number(float(Fraction(text)))
+            numerator = fraction.group(1).replace(",", "")
+            denominator = fraction.group(2).replace(",", "")
+            return format_number(float(Fraction(numerator) / Fraction(denominator)))
         except ZeroDivisionError:
             return text
-    if re.fullmatch(r"-?\d+(?:\.\d+)?", text):
-        return format_number(float(text))
+    if re.fullmatch(_NUMBER_PATTERN, text):
+        numeric = float(text)
+        return format_number(numeric) if math.isfinite(numeric) else text.lower()
 
     trailing_number = _NUMBER_RE.findall(text)
     if trailing_number:
@@ -272,11 +316,12 @@ def answers_match(predicted: Any, expected: Any, tolerance: float = 1e-6) -> boo
 
 def choice_to_value(text: str) -> float | None:
     cleaned = text.strip().replace(",", "")
-    if re.fullmatch(r"-?\d+(?:\.\d+)?%", cleaned):
+    if re.fullmatch(rf"{_NUMBER_PATTERN}%", cleaned):
         return float(cleaned[:-1])
-    if re.fullmatch(r"-?\d+(?:\.\d+)?/-?\d+(?:\.\d+)?", cleaned):
+    fraction = re.fullmatch(rf"({_NUMBER_PATTERN})\s*/\s*({_NUMBER_PATTERN})", cleaned)
+    if fraction:
         try:
-            return float(Fraction(cleaned))
+            return float(Fraction(fraction.group(1)) / Fraction(fraction.group(2)))
         except ZeroDivisionError:
             return None
     number = _NUMBER_RE.search(cleaned)

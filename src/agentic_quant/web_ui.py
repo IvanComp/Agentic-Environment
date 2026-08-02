@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import re
 import threading
+import time
 import uuid
 import webbrowser
 from datetime import datetime
@@ -13,19 +15,31 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from . import __version__
 from .benchmarks import all_benchmark_info, available_benchmarks, benchmark_info
-from .metrics import summarise
+from .metrics import SummaryAccumulator, summarise
 from .model_registry import available_model_keys, available_model_presets, get_model_preset
 from .model_store import download_model, missing_model_keys, selected_models_status
+from .paths import workspace_root
 from .run_benchmark import run_experiment
 
 
 MECHANISMS = ["voting", "role", "debate"]
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = workspace_root()
 DOWNLOAD_JOBS: dict[str, dict[str, Any]] = {}
 DOWNLOAD_LOCK = threading.Lock()
 RUN_JOBS: dict[str, dict[str, Any]] = {}
 RUN_LOCK = threading.Lock()
+MAX_REQUEST_BYTES = 64 * 1024
+MAX_RETAINED_JOBS = 32
+JOB_RETENTION_SECONDS = 6 * 60 * 60
+MAX_ACTIVE_RUNS = 4
+MAX_ACTIVE_DOWNLOADS = 4
+
+
+class AgenticQuantServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
 
 
 def main() -> None:
@@ -35,7 +49,7 @@ def main() -> None:
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
 
-    server = ThreadingHTTPServer((args.host, args.port), AgenticQuantHandler)
+    server = AgenticQuantServer((args.host, args.port), AgenticQuantHandler)
     url = f"http://{args.host}:{args.port}"
     print(f"Agentic Systems Experiment UI running at {url}")
     print("Press Ctrl+C to stop.")
@@ -50,7 +64,8 @@ def main() -> None:
 
 
 class AgenticQuantHandler(BaseHTTPRequestHandler):
-    server_version = "AgenticQuantUI/0.1"
+    server_version = "AgenticQuantUI/0.2"
+    sys_version = ""
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -61,6 +76,27 @@ class AgenticQuantHandler(BaseHTTPRequestHandler):
             self.send_response(HTTPStatus.NO_CONTENT)
             self.end_headers()
             return
+        if parsed.path == "/api/health":
+            with RUN_LOCK:
+                active_runs = sum(
+                    job.get("status") in {"queued", "running", "downloading"}
+                    for job in RUN_JOBS.values()
+                )
+            with DOWNLOAD_LOCK:
+                active_downloads = sum(
+                    job.get("status") in {"queued", "downloading"}
+                    for job in DOWNLOAD_JOBS.values()
+                )
+            self._send_json(
+                {
+                    "ok": True,
+                    "status": "healthy",
+                    "version": __version__,
+                    "activeRuns": active_runs,
+                    "activeDownloads": active_downloads,
+                }
+            )
+            return
         if parsed.path == "/api/options":
             self._send_json(
                 {
@@ -69,33 +105,47 @@ class AgenticQuantHandler(BaseHTTPRequestHandler):
                     "mechanisms": MECHANISMS,
                     "models": [preset.to_dict() for preset in available_model_presets()],
                     "modelStatuses": selected_models_status(available_model_keys()),
-                    "defaultRunName": f"ui_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    "defaultRunName": _new_run_name(),
                 }
             )
             return
         if parsed.path == "/api/model-status":
-            query = parse_qs(parsed.query)
-            keys = query.get("models", [])
-            if keys:
-                model_keys = [key for raw in keys for key in raw.split(",") if key]
-            else:
-                model_keys = available_model_keys()
-            self._send_json({"models": selected_models_status(model_keys), "missing": missing_model_keys(model_keys)})
+            try:
+                query = parse_qs(parsed.query)
+                keys = query.get("models", [])
+                model_keys = [key for raw in keys for key in raw.split(",") if key] if keys else available_model_keys()
+                _validate_subset("models", model_keys, available_model_keys())
+                self._send_json({"models": selected_models_status(model_keys), "missing": missing_model_keys(model_keys)})
+            except ValueError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
         if parsed.path == "/api/download-status":
             job_id = parse_qs(parsed.query).get("job", [""])[0]
             with DOWNLOAD_LOCK:
-                job = DOWNLOAD_JOBS.get(job_id)
+                stored_job = DOWNLOAD_JOBS.get(job_id)
+                job = copy.deepcopy(
+                    {key: value for key, value in stored_job.items() if not key.startswith("_")}
+                ) if stored_job else None
             if not job:
                 self._send_json({"ok": False, "error": "Download job not found."}, status=HTTPStatus.NOT_FOUND)
                 return
             self._send_json({"ok": True, "job": job})
             return
         if parsed.path == "/api/run-status":
-            job_id = parse_qs(parsed.query).get("job", [""])[0]
+            query = parse_qs(parsed.query)
+            job_id = query.get("job", [""])[0]
+            try:
+                record_offset = _int_in_range(query.get("recordOffset", [0])[0], "recordOffset", 0, 10**9, default=0)
+                interaction_offset = _int_in_range(query.get("interactionOffset", [0])[0], "interactionOffset", 0, 10**9, default=0)
+            except ValueError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+                return
             with RUN_LOCK:
-                job = RUN_JOBS.get(job_id)
-                public_job = _public_run_job(job) if job else None
+                public_job = _public_run_job(
+                    RUN_JOBS.get(job_id),
+                    record_offset=record_offset,
+                    interaction_offset=interaction_offset,
+                )
             if not public_job:
                 self._send_json({"ok": False, "error": "Run job not found."}, status=HTTPStatus.NOT_FOUND)
                 return
@@ -130,7 +180,15 @@ class AgenticQuantHandler(BaseHTTPRequestHandler):
         print(f"{self.address_string()} - {format % args}")
 
     def _read_json(self) -> dict[str, Any]:
-        length = int(self.headers.get("Content-Length", "0"))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise ValueError("Content-Length must be an integer.") from exc
+        if length < 0 or length > MAX_REQUEST_BYTES:
+            raise ValueError(f"Request body must not exceed {MAX_REQUEST_BYTES // 1024} KiB.")
+        content_type = self.headers.get_content_type()
+        if length and content_type != "application/json":
+            raise ValueError("Content-Type must be application/json.")
         data = self.rfile.read(length)
         if not data:
             return {}
@@ -144,16 +202,30 @@ class AgenticQuantHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self._send_security_headers(cache_control="no-store")
         self.end_headers()
-        self.wfile.write(encoded)
+        try:
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _send_html(self, html: str) -> None:
         encoded = html.encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self._send_security_headers(cache_control="no-cache")
         self.end_headers()
-        self.wfile.write(encoded)
+        try:
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _send_security_headers(self, *, cache_control: str) -> None:
+        self.send_header("Cache-Control", cache_control)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'")
 
 
 def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -161,6 +233,8 @@ def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
     mechanisms = _clean_list(payload.get("mechanisms"), MECHANISMS)
     _validate_subset("benchmarks", benchmarks, available_benchmarks())
     _validate_subset("mechanisms", mechanisms, MECHANISMS)
+    if not benchmarks or not mechanisms:
+        raise ValueError("Select at least one benchmark and one coordination mechanism.")
 
     agent_count = _int_in_range(payload.get("agentCount"), "agentCount", 1, 12, default=3)
     agent_models = _clean_model_keys(payload.get("agentModels"))
@@ -176,7 +250,10 @@ def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
     _validate_subset("votingTieBreaker", [voting_tie_breaker], ["confidence", "first"])
     benchmark_limits = _clean_question_limits(payload.get("questionLimits"), benchmarks)
     run_name = _safe_run_name(str(payload.get("runName") or ""))
-    out_dir = PROJECT_ROOT / "runs" / run_name
+    runs_root = (PROJECT_ROOT / "runs").resolve()
+    out_dir = (runs_root / run_name).resolve()
+    if not out_dir.is_relative_to(runs_root):
+        raise ValueError("Run output must stay inside the configured runs directory.")
 
     return {
         "model_key": model_key,
@@ -191,16 +268,17 @@ def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "agent_count": agent_count,
         "agent_roles": agent_roles,
         "out": out_dir,
+        "retain_records": False,
     }
 
 
 def _clean_list(value: Any, default: list[str]) -> list[str]:
-    if not value:
-        return default
+    if value is None:
+        return list(default)
     if not isinstance(value, list):
         raise ValueError("Expected a list.")
     cleaned = [str(item) for item in value if str(item).strip()]
-    return cleaned or default
+    return cleaned
 
 
 def _clean_model_keys(value: Any) -> list[str]:
@@ -283,8 +361,12 @@ def _safe_run_name(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
     cleaned = cleaned.strip("._-")
     if not cleaned:
-        cleaned = f"ui_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        cleaned = _new_run_name()
     return cleaned[:80]
+
+
+def _new_run_name() -> str:
+    return f"ui_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
 
 
 def _blank_to_none(value: Any) -> str | None:
@@ -308,12 +390,24 @@ def _start_download_job(model_keys: list[str]) -> str:
         "percent": 100 if not missing else 0,
         "completedModels": [],
         "error": "",
+        "_created_at": time.time(),
     }
     with DOWNLOAD_LOCK:
+        _prune_jobs(DOWNLOAD_JOBS)
+        active_downloads = sum(
+            job.get("status") in {"queued", "downloading"} for job in DOWNLOAD_JOBS.values()
+        )
+        if missing and active_downloads >= MAX_ACTIVE_DOWNLOADS:
+            raise ValueError("Too many model downloads are already active. Try again shortly.")
         DOWNLOAD_JOBS[job_id] = initial
     if missing:
         thread = threading.Thread(target=_download_worker, args=(job_id, missing), daemon=True)
-        thread.start()
+        try:
+            thread.start()
+        except Exception:
+            with DOWNLOAD_LOCK:
+                DOWNLOAD_JOBS.pop(job_id, None)
+            raise
     return job_id
 
 
@@ -349,15 +443,24 @@ def _download_worker(job_id: str, model_keys: list[str]) -> None:
                 DOWNLOAD_JOBS[job_id]["completedModels"].append(model_key)
         with DOWNLOAD_LOCK:
             DOWNLOAD_JOBS[job_id].update(
-                {"status": "done", "currentModel": "", "currentLabel": "", "percent": 100}
+                {
+                    "status": "done",
+                    "currentModel": "",
+                    "currentLabel": "",
+                    "percent": 100,
+                    "_finished_at": time.time(),
+                }
             )
     except Exception as exc:
         with DOWNLOAD_LOCK:
-            DOWNLOAD_JOBS[job_id].update({"status": "error", "error": str(exc)})
+            DOWNLOAD_JOBS[job_id].update(
+                {"status": "error", "error": str(exc), "_finished_at": time.time()}
+            )
 
 
 def _start_run_job(config: dict[str, Any]) -> str:
     job_id = uuid.uuid4().hex
+    out_path = str(Path(config["out"]).resolve())
     initial = {
         "id": job_id,
         "status": "queued",
@@ -373,12 +476,32 @@ def _start_run_job(config: dict[str, Any]) -> str:
         "currentModel": "",
         "currentLabel": "",
         "error": "",
-        "_records": [],
+        "_summary_accumulator": SummaryAccumulator(),
+        "_created_at": time.time(),
+        "_out_path": out_path,
+        "completedRecords": 0,
+        "totalRecords": _planned_record_count(config),
     }
     with RUN_LOCK:
+        _prune_jobs(RUN_JOBS)
+        active_runs = sum(
+            job.get("status") in {"queued", "running", "downloading"} for job in RUN_JOBS.values()
+        )
+        if active_runs >= MAX_ACTIVE_RUNS:
+            raise ValueError("Too many experiments are already active. Try again shortly.")
+        if any(
+            job.get("_out_path") == out_path and job.get("status") in {"queued", "running", "downloading"}
+            for job in RUN_JOBS.values()
+        ):
+            raise ValueError("A run with this output name is already in progress.")
         RUN_JOBS[job_id] = initial
     thread = threading.Thread(target=_run_worker, args=(job_id, config), daemon=True)
-    thread.start()
+    try:
+        thread.start()
+    except Exception:
+        with RUN_LOCK:
+            RUN_JOBS.pop(job_id, None)
+        raise
     return job_id
 
 
@@ -404,10 +527,11 @@ def _run_worker(job_id: str, config: dict[str, Any]) -> None:
         interaction = _interaction_payload(record)
         with RUN_LOCK:
             job = RUN_JOBS[job_id]
-            job["_records"].append(record)
             job["records"].append(lightweight)
             job["interactions"].append(interaction)
-            job["summary"] = summarise(job["_records"])
+            job["_summary_accumulator"].add(record)
+            job["summary"] = job["_summary_accumulator"].snapshot()
+            job["completedRecords"] += 1
             job["status"] = "running"
             job["message"] = f"Completed {record['item_id']} / {record['mechanism']}."
 
@@ -431,18 +555,27 @@ def _run_worker(job_id: str, config: dict[str, Any]) -> None:
                     "downloadPercent": 100,
                     "currentModel": "",
                     "currentLabel": "",
+                    "_finished_at": time.time(),
                 }
             )
     except Exception as exc:
         with RUN_LOCK:
-            RUN_JOBS[job_id].update({"status": "error", "message": str(exc), "error": str(exc)})
+            RUN_JOBS[job_id].update(
+                {
+                    "status": "error",
+                    "message": str(exc),
+                    "error": str(exc),
+                    "_finished_at": time.time(),
+                }
+            )
 
 
 def _lightweight_record(row: dict[str, Any]) -> dict[str, Any]:
+    task_info = benchmark_info(row["benchmark"])
     return {
         "benchmark": row["benchmark"],
-        "task_label": benchmark_info(row["benchmark"])["label"],
-        "task_type": benchmark_info(row["benchmark"])["task_type"],
+        "task_label": task_info["label"],
+        "task_type": task_info["task_type"],
         "item_id": row["item_id"],
         "mechanism": row["mechanism"],
         "final_answer": row["final_answer"],
@@ -461,17 +594,74 @@ def _lightweight_record(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _public_run_job(job: dict[str, Any] | None) -> dict[str, Any] | None:
+def _public_run_job(
+    job: dict[str, Any] | None,
+    *,
+    record_offset: int = 0,
+    interaction_offset: int = 0,
+) -> dict[str, Any] | None:
     if not job:
         return None
-    return {key: value for key, value in job.items() if not key.startswith("_")}
+    public = {
+        key: value
+        for key, value in job.items()
+        if not key.startswith("_") and key not in {"records", "interactions"}
+    }
+    records = job.get("records", [])
+    interactions = job.get("interactions", [])
+    public.update(
+        {
+            "records": records[min(record_offset, len(records)) :],
+            "interactions": interactions[min(interaction_offset, len(interactions)) :],
+            "recordOffset": min(record_offset, len(records)),
+            "interactionOffset": min(interaction_offset, len(interactions)),
+            "recordCount": len(records),
+            "interactionCount": len(interactions),
+        }
+    )
+    return copy.deepcopy(public)
+
+
+def _planned_record_count(config: dict[str, Any]) -> int:
+    limits = config.get("benchmark_limits") or {}
+    questions = 0
+    for benchmark in config.get("benchmarks", []):
+        item_count = int(benchmark_info(benchmark)["item_count"])
+        limit = limits.get(benchmark)
+        questions += item_count if limit is None else min(item_count, int(limit))
+    return questions * len(config.get("mechanisms", []))
+
+
+def _prune_jobs(jobs: dict[str, dict[str, Any]]) -> None:
+    now = time.time()
+    terminal = {"done", "error", "cancelled"}
+    expired = [
+        job_id
+        for job_id, job in jobs.items()
+        if job.get("status") in terminal
+        and now - float(job.get("_finished_at", job.get("_created_at", now))) > JOB_RETENTION_SECONDS
+    ]
+    for job_id in expired:
+        jobs.pop(job_id, None)
+    overflow = max(0, len(jobs) - MAX_RETAINED_JOBS + 1)
+    if overflow:
+        removable = sorted(
+            (
+                (float(job.get("_created_at", 0)), job_id)
+                for job_id, job in jobs.items()
+                if job.get("status") in terminal
+            )
+        )
+        for _, job_id in removable[:overflow]:
+            jobs.pop(job_id, None)
 
 
 def _interaction_payload(row: dict[str, Any]) -> dict[str, Any]:
+    task_info = benchmark_info(row["benchmark"])
     return {
         "benchmark": row["benchmark"],
-        "task_label": benchmark_info(row["benchmark"])["label"],
-        "task_type": benchmark_info(row["benchmark"])["task_type"],
+        "task_label": task_info["label"],
+        "task_type": task_info["task_type"],
         "item_id": row["item_id"],
         "mechanism": row["mechanism"],
         "question": row["question"],
@@ -1105,6 +1295,7 @@ INDEX_HTML = r"""<!doctype html>
       border: 1px solid transparent;
       border-left-width: 4px;
       border-radius: 5px;
+      overflow-wrap: anywhere;
     }
     .agent-message.correct {
       border-color: #a7d8bd;
@@ -1133,6 +1324,7 @@ INDEX_HTML = r"""<!doctype html>
     }
     .rationale {
       white-space: pre-wrap;
+      word-break: break-word;
     }
     .empty {
       display: grid;
@@ -1235,9 +1427,23 @@ INDEX_HTML = r"""<!doctype html>
       ['skeptic', 'Skeptic']
     ];
 
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_error) {
+        throw new Error(`Server returned an invalid response (${response.status}).`);
+      }
+      if (!response.ok) {
+        throw new Error(data.error || `Request failed (${response.status}).`);
+      }
+      return data;
+    }
+
     async function loadOptions() {
-      const response = await fetch('/api/options');
-      const data = await response.json();
+      const data = await fetchJson('/api/options');
       modelOptions = data.models;
       fillBenchmarkCards(data.benchmarkInfo);
       renderAgentRows();
@@ -1865,12 +2071,11 @@ INDEX_HTML = r"""<!doctype html>
       $('results').style.display = 'block';
       render({summary: {overall: {question_count: 0, accuracy: 0, mean_elapsed_s: 0, mean_total_tokens: 0}, by_benchmark_mechanism: []}, records: [], interactions: [], resultsPath: ''});
       try {
-        const response = await fetch('/api/run', {
+        const data = await fetchJson('/api/run', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(collectPayload())
         });
-        const data = await response.json();
         if (!data.ok) {
           throw new Error(data.error || 'Unknown error');
         }
@@ -1883,13 +2088,41 @@ INDEX_HTML = r"""<!doctype html>
     });
 
     async function pollRun(jobId) {
+      const records = [];
+      const interactions = [];
+      let retryCount = 0;
+      let pollDelay = 500;
+      let previousStatus = '';
       while (true) {
-        const response = await fetch(`/api/run-status?job=${encodeURIComponent(jobId)}`);
-        const data = await response.json();
+        const query = new URLSearchParams({
+          job: jobId,
+          recordOffset: String(records.length),
+          interactionOffset: String(interactions.length)
+        });
+        let data;
+        try {
+          data = await fetchJson(`/api/run-status?${query}`);
+          retryCount = 0;
+        } catch (error) {
+          retryCount += 1;
+          if (retryCount > 5) throw error;
+          $('status').textContent = `Connection interrupted; retrying (${retryCount}/5)...`;
+          await new Promise((resolve) => setTimeout(resolve, Math.min(4000, retryCount * 750)));
+          continue;
+        }
         if (!data.ok) throw new Error(data.error || 'Run status unavailable');
         const job = data.job;
-        render(job);
-        updateRunProgress(job);
+        const newRecords = job.records || [];
+        const newInteractions = job.interactions || [];
+        records.push(...newRecords);
+        interactions.push(...newInteractions);
+        const completeJob = {...job, records: [...records], interactions: [...interactions]};
+        const statusChanged = job.status !== previousStatus;
+        if (newRecords.length || newInteractions.length || statusChanged || job.status === 'done') {
+          render(completeJob);
+        }
+        updateRunProgress(completeJob);
+        previousStatus = job.status;
         if (job.status === 'done') {
           $('status').textContent = 'Complete.';
           return;
@@ -1897,7 +2130,8 @@ INDEX_HTML = r"""<!doctype html>
         if (job.status === 'error') {
           throw new Error(job.error || job.message || 'Experiment error');
         }
-        await new Promise((resolve) => setTimeout(resolve, 700));
+        pollDelay = newRecords.length || newInteractions.length ? 500 : Math.min(2000, pollDelay * 1.4);
+        await new Promise((resolve) => setTimeout(resolve, pollDelay));
       }
     }
 
@@ -1915,8 +2149,13 @@ INDEX_HTML = r"""<!doctype html>
         return;
       }
       $('download-progress').style.display = 'block';
-      $('download-bar').style.width = '100%';
-      $('download-text').textContent = job.message || 'Running.';
+      const completed = Number(job.completedRecords || 0);
+      const total = Number(job.totalRecords || 0);
+      const percent = total ? Math.min(100, completed / total * 100) : 0;
+      $('download-bar').style.width = `${percent}%`;
+      $('download-text').textContent = total
+        ? `${job.message || 'Running.'} ${completed} / ${total}`
+        : (job.message || 'Running.');
     }
 
     function downloadMessage(job) {

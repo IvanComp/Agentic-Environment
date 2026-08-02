@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-import shutil
+import os
+import re
+import threading
+from collections import defaultdict
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 from urllib.request import Request, urlopen
 
 from .model_registry import get_model_preset
+from .paths import workspace_root
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = workspace_root()
 MODELS_DIR = PROJECT_ROOT / "models"
 
 ProgressCallback = Callable[[int, int], None]
+_MODEL_LOCKS: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
 
 
 def model_file_paths(model_key: str) -> list[Path]:
@@ -25,7 +30,7 @@ def model_path(model_key: str) -> Path:
     return model_file_paths(model_key)[0]
 
 
-def model_status(model_key: str) -> dict:
+def model_status(model_key: str) -> dict[str, Any]:
     preset = get_model_preset(model_key)
     if model_key == "demo":
         return {
@@ -40,16 +45,21 @@ def model_status(model_key: str) -> dict:
         }
 
     paths = model_file_paths(model_key)
-    file_statuses = [
-        {
-            "filename": path.name,
-            "path": str(path),
-            "exists": path.exists(),
-            "bytes": path.stat().st_size if path.exists() else 0,
-        }
-        for path in paths
-    ]
-    downloaded_bytes = sum(file_status["bytes"] for file_status in file_statuses)
+    file_statuses = []
+    for path in paths:
+        exists = path.is_file()
+        partial_path = path.with_suffix(path.suffix + ".part")
+        partial_bytes = partial_path.stat().st_size if not exists and partial_path.is_file() else 0
+        file_statuses.append(
+            {
+                "filename": path.name,
+                "path": str(path),
+                "exists": exists,
+                "bytes": path.stat().st_size if exists else 0,
+                "partial_bytes": partial_bytes,
+            }
+        )
+    downloaded_bytes = sum(file_status["bytes"] or file_status["partial_bytes"] for file_status in file_statuses)
     total = preset.expected_bytes or downloaded_bytes
     downloaded = all(file_status["exists"] for file_status in file_statuses) and (
         preset.expected_bytes == 0 or downloaded_bytes == preset.expected_bytes
@@ -95,6 +105,11 @@ def ensure_models(model_keys: list[str], *, download: bool, progress: Callable[[
 
 
 def download_model(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
+    with _MODEL_LOCKS[model_key]:
+        return _download_model_locked(model_key, progress=progress)
+
+
+def _download_model_locked(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
     preset = get_model_preset(model_key)
     if model_key == "demo":
         return model_path(model_key)
@@ -109,32 +124,56 @@ def download_model(model_key: str, *, progress: ProgressCallback | None = None) 
         return final_paths[0]
 
     final_paths[0].parent.mkdir(parents=True, exist_ok=True)
-    completed_bytes = 0
     expected_total = preset.expected_bytes
 
-    for url, final_path in zip(preset.download_urls, final_paths, strict=True):
-        tmp_path = final_path.with_suffix(final_path.suffix + ".part")
-        if tmp_path.exists():
-            tmp_path.unlink()
+    # A previous version may have left complete-looking files whose aggregate
+    # size is invalid. Redownload that set instead of permanently failing on it.
+    if expected_total and all(path.is_file() for path in final_paths):
+        current_total = sum(path.stat().st_size for path in final_paths)
+        if current_total != expected_total:
+            for path in final_paths:
+                path.unlink()
 
-        request = Request(url, headers={"User-Agent": "agentic-quant/0.1"})
+    completed_bytes = sum(path.stat().st_size for path in final_paths if path.is_file())
+    if progress and completed_bytes:
+        progress(completed_bytes, expected_total or completed_bytes)
+
+    for url, final_path in zip(preset.download_urls, final_paths, strict=True):
+        if final_path.is_file():
+            continue
+        tmp_path = final_path.with_suffix(final_path.suffix + ".part")
+        resume_bytes = tmp_path.stat().st_size if tmp_path.is_file() else 0
+        headers = {"User-Agent": "agentic-quant/0.2"}
+        if resume_bytes:
+            headers["Range"] = f"bytes={resume_bytes}-"
+
+        request = Request(url, headers=headers)
         with urlopen(request, timeout=60) as response:
-            file_total = _content_length(response)
+            status_code = getattr(response, "status", response.getcode())
+            range_start = _content_range_start(response)
+            if resume_bytes and status_code == 206 and range_start != resume_bytes:
+                raise RuntimeError(
+                    f"Server resumed {final_path.name} at byte {range_start}, expected {resume_bytes}."
+                )
+            is_resumed = resume_bytes > 0 and status_code == 206
+            write_mode = "ab" if is_resumed else "wb"
+            starting_bytes = resume_bytes if is_resumed else 0
+            file_total = _response_file_size(response, starting_bytes)
             total_for_progress = expected_total or completed_bytes + file_total
-            downloaded = 0
-            with tmp_path.open("wb") as handle:
-                while True:
-                    chunk = response.read(1024 * 1024)
-                    if not chunk:
-                        break
+            downloaded = starting_bytes
+            with tmp_path.open(write_mode) as handle:
+                while chunk := response.read(1024 * 1024):
                     handle.write(chunk)
                     downloaded += len(chunk)
                     if progress:
                         progress(completed_bytes + downloaded, total_for_progress)
 
-        if final_path.exists():
-            final_path.unlink()
-        shutil.move(str(tmp_path), final_path)
+        actual_file_size = tmp_path.stat().st_size
+        if file_total and actual_file_size != file_total:
+            raise RuntimeError(
+                f"Incomplete file {final_path.name}: {actual_file_size} bytes instead of {file_total}."
+            )
+        os.replace(tmp_path, final_path)
         completed_bytes += final_path.stat().st_size
 
     actual_size = sum(path.stat().st_size for path in final_paths if path.exists())
@@ -152,3 +191,18 @@ def _content_length(response) -> int:
     if header_value and header_value.isdigit():
         return int(header_value)
     return 0
+
+
+def _response_file_size(response: Any, starting_bytes: int) -> int:
+    content_range = response.headers.get("Content-Range", "")
+    range_match = re.search(r"/(\d+)$", content_range)
+    if range_match:
+        return int(range_match.group(1))
+    length = _content_length(response)
+    return starting_bytes + length if length else 0
+
+
+def _content_range_start(response: Any) -> int | None:
+    content_range = response.headers.get("Content-Range", "")
+    match = re.match(r"bytes\s+(\d+)-", content_range, flags=re.I)
+    return int(match.group(1)) if match else None

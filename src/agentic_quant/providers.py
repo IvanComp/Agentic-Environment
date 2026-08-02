@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -120,6 +121,10 @@ class GgufModelProvider:
         self.preset = get_model_preset(model_key)
         self.model_key = model_key
         self.n_ctx = n_ctx
+        # llama.cpp contexts are stateful. A provider can be shared by several
+        # agents to avoid loading the same multi-GB model more than once, so
+        # serialize calls that target that shared context.
+        self._generation_lock = threading.Lock()
         self.llm = self._load_llm()
 
     def generate(
@@ -131,14 +136,15 @@ class GgufModelProvider:
         metadata: dict[str, Any] | None = None,
     ) -> LLMResponse:
         started = time.perf_counter()
-        result = self._complete(prompt, max_tokens=max_tokens, temperature=temperature)
+        with self._generation_lock:
+            result = self._complete(prompt, max_tokens=max_tokens, temperature=temperature)
         text = _extract_llama_text(result)
-        usage = result.get("usage", {})
+        usage = result.get("usage", {}) if isinstance(result, dict) else {}
         elapsed = time.perf_counter() - started
         return LLMResponse(
             text=text,
-            prompt_tokens=int(usage.get("prompt_tokens") or estimate_tokens(prompt)),
-            completion_tokens=int(usage.get("completion_tokens") or estimate_tokens(text)),
+            prompt_tokens=_safe_token_count(usage.get("prompt_tokens"), prompt),
+            completion_tokens=_safe_token_count(usage.get("completion_tokens"), text),
             elapsed_s=elapsed,
             model=self.model_key,
         )
@@ -214,6 +220,8 @@ def make_provider(
 
 
 def _extract_llama_text(result: dict[str, Any]) -> str:
+    if not isinstance(result, dict):
+        return ""
     choices = result.get("choices") or []
     if not choices:
         return ""
@@ -222,6 +230,14 @@ def _extract_llama_text(result: dict[str, Any]) -> str:
     if isinstance(message, dict) and message.get("content") is not None:
         return str(message["content"]).strip()
     return str(first.get("text", "")).strip()
+
+
+def _safe_token_count(value: Any, fallback_text: str) -> int:
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return estimate_tokens(fallback_text)
+    return max(0, count)
 
 
 def _solve_gsm8k_style(question: str) -> tuple[str, str]:

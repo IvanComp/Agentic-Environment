@@ -5,7 +5,8 @@ import unittest
 from agentic_quant.agents import Agent
 from agentic_quant.benchmarks import BenchmarkItem
 from agentic_quant.providers import LLMResponse
-from agentic_quant.tools import extract_final_answer_from_rationale
+from agentic_quant.evaluation import map_to_choice
+from agentic_quant.tools import extract_final_answer_from_rationale, normalize_answer
 
 
 class StaticProvider:
@@ -25,6 +26,20 @@ class StaticProvider:
 
 
 class AnswerReconciliationTest(unittest.TestCase):
+    def test_normalizes_spaced_fractions_and_scientific_notation(self) -> None:
+        self.assertEqual(normalize_answer("5 / 8"), "0.625")
+        self.assertEqual(normalize_answer("1e3"), "1000")
+
+    def test_maps_spaced_fraction_to_multiple_choice(self) -> None:
+        item = BenchmarkItem(
+            item_id="fraction",
+            benchmark="aqua_rat_mini",
+            question="Probability?",
+            choices={"A": "3/8", "B": "1/2", "C": "5/8"},
+            answer="C",
+        )
+        self.assertEqual(map_to_choice(item, "5 / 8"), "C")
+
     def test_extracts_final_equation_result_from_rationale(self) -> None:
         rationale = (
             "Natalia sold half as many clips in May as in April, which is 24 clips. "

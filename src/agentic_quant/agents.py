@@ -61,7 +61,12 @@ class Agent:
             },
         )
         parsed = try_parse_json(response.text) or {}
-        reported_answer = str(parsed.get("answer", extract_answer_candidate(response.text, item.choices))).strip()
+        parsed_answer = parsed.get("answer")
+        reported_answer = (
+            str(parsed_answer).strip()
+            if parsed_answer is not None and str(parsed_answer).strip()
+            else extract_answer_candidate(response.text, item.choices)
+        )
         confidence = _coerce_confidence(parsed.get("confidence", 0.5))
         rationale = extract_rationale_candidate(response.text)
         answer, answer_source, answer_note = _reconcile_answer(item, reported_answer, rationale)
@@ -176,10 +181,15 @@ def outputs_to_context(outputs: list[AgentOutput]) -> str:
         }
         for output in outputs
     ]
-    return json.dumps(compact, indent=2)
+    return json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
 
 
 def _coerce_confidence(value: Any) -> float:
+    if isinstance(value, str) and value.strip().endswith("%"):
+        try:
+            value = float(value.strip()[:-1]) / 100
+        except ValueError:
+            return 0.5
     try:
         number = float(value)
     except (TypeError, ValueError):

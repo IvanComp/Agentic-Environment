@@ -91,6 +91,12 @@ From the UI you can choose:
 
 The UI automatically generates the run name and saves `results.jsonl`, `summary.json`, and `config.json` under `runs/<run-name>/`. Downloaded models are stored under `models/<model-name>/`.
 
+Source/editable installs use the repository as their storage root. Set `AGENTIC_QUANT_HOME=/path/to/workspace` to choose an explicit writable location when running an installed package or a long-lived service.
+
+Long runs are streamed incrementally: each completed coordination is appended to `results.jsonl` immediately, and the UI requests only records produced since its previous poll. Progress therefore remains responsive without repeatedly transferring the complete trace history. Completed UI jobs are bounded and expired automatically so a long-lived server does not grow without limit.
+
+For local process monitoring, `GET /api/health` reports the application version and active run/download counts.
+
 ## Real Models
 
 List model presets:
@@ -148,6 +154,24 @@ Dynamic agent count:
 agentic-quant --model demo --agents 5 --mechanisms voting role debate --out runs/five_agents
 ```
 
+Independent voting agents, debate participants, and role workers using distinct real model providers run concurrently by default. The lightweight demo avoids thread overhead. A shared GGUF context is protected by a lock, so selecting the same model for several agents loads it only once and never invokes that stateful context concurrently. Use sequential execution for diagnostics if needed:
+
+```bash
+agentic-quant --model demo --agents 5 --sequential-agents --out runs/sequential_check
+```
+
+Role labels and the voting tie-breaker are also configurable from the CLI:
+
+```bash
+agentic-quant \
+  --agents 3 \
+  --agent-roles planner solver critic \
+  --voting-tie-breaker confidence \
+  --out runs/configured_roles
+```
+
+Interrupted model downloads keep their `.part` file and resume with an HTTP range request on the next attempt. Concurrent requests for the same model are serialized to prevent file corruption.
+
 ## Outputs
 
 Each run writes:
@@ -183,6 +207,14 @@ RESULTS_PATH = Path("../runs/latest/results.jsonl")
 ```
 
 to analyze another run.
+
+## Verification
+
+The test suite covers answer parsing and reconciliation, mechanism-specific role isolation, concurrent coordination, incremental metrics and persistence, resumable model downloads, and streamed UI job payloads:
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## Technical References
 

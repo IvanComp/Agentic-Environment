@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -9,7 +11,7 @@ from typing import Any, Callable
 from .agents import build_agents_for_providers
 from .benchmarks import available_benchmarks, load_benchmark
 from .coordinator import Coordinator
-from .metrics import summarise
+from .metrics import SummaryAccumulator
 from .model_registry import available_model_keys, available_model_presets, get_model_preset
 from .model_store import ensure_models
 from .providers import make_model_provider
@@ -33,11 +35,22 @@ def run_experiment(
     echo: bool = True,
     on_record: Callable[[dict[str, Any]], None] | None = None,
     download_progress: Callable[[str, int, int], None] | None = None,
+    parallel_agents: bool = True,
+    retain_records: bool = True,
 ) -> dict[str, Any]:
-    benchmarks = benchmarks or available_benchmarks()
-    mechanisms = mechanisms or ["voting", "role", "debate"]
-    if agent_count < 1 or agent_count > 12:
-        raise ValueError("agent_count must be between 1 and 12")
+    benchmarks = list(dict.fromkeys(available_benchmarks() if benchmarks is None else benchmarks))
+    mechanisms = list(dict.fromkeys(["voting", "role", "debate"] if mechanisms is None else mechanisms))
+    _validate_run_configuration(
+        benchmarks=benchmarks,
+        mechanisms=mechanisms,
+        limit=limit,
+        benchmark_limits=benchmark_limits,
+        debate_rounds=debate_rounds,
+        voting_tie_breaker=voting_tie_breaker,
+        agent_count=agent_count,
+        agent_roles=agent_roles,
+        n_ctx=n_ctx,
+    )
     get_model_preset(model_key)
     agent_model_keys = _normalise_agent_models(model_key, agent_model_keys, agent_count)
     for key in agent_model_keys:
@@ -45,51 +58,6 @@ def run_experiment(
 
     out_dir = Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    ensure_models(
-        agent_model_keys,
-        download=download_model,
-        progress=download_progress or (_console_download_progress if echo else None),
-    )
-    provider_cache = {
-        key: make_model_provider(model_key=key, n_ctx=n_ctx)
-        for key in dict.fromkeys(agent_model_keys)
-    }
-    agent_providers = [provider_cache[key] for key in agent_model_keys]
-    coordinators = {
-        mechanism: Coordinator(
-            build_agents_for_providers(
-                agent_providers,
-                role_overrides=(
-                    agent_roles
-                    if mechanism == "role"
-                    else [_neutral_agent_instruction(mechanism)] * agent_count
-                ),
-                descriptive_names=False,
-            ),
-            debate_rounds=debate_rounds,
-            voting_tie_breaker=voting_tie_breaker,
-        )
-        for mechanism in dict.fromkeys(mechanisms)
-    }
-
-    records: list[dict[str, Any]] = []
-    for benchmark_name in benchmarks:
-        benchmark_limit = benchmark_limits.get(benchmark_name, limit) if benchmark_limits else limit
-        for item in load_benchmark(benchmark_name, limit=benchmark_limit):
-            for mechanism in mechanisms:
-                result = coordinators[mechanism].run(item, mechanism)
-                record = result.to_dict()
-                records.append(record)
-                if on_record:
-                    on_record(record)
-                if echo:
-                    status = "ok" if result.correct else "miss"
-                    print(
-                        f"{benchmark_name:14s} {item.item_id:10s} {mechanism:7s} "
-                        f"{status:4s} pred={result.final_answer_display!r} gold={result.gold_display!r} "
-                        f"agents={agent_count} tokens={result.total_tokens} time={result.elapsed_s:.3f}s"
-                    )
 
     config = {
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -107,16 +75,78 @@ def run_experiment(
         "voting_tie_breaker": voting_tie_breaker,
         "agent_count": agent_count,
         "agent_roles": agent_roles or [],
+        "parallel_agents": parallel_agents,
+        "retain_records": retain_records,
     }
+    _atomic_write_json(out_dir / "config.json", config)
 
+    ensure_models(
+        agent_model_keys,
+        download=download_model,
+        progress=download_progress or (_console_download_progress if echo else None),
+    )
+    provider_cache = {
+        key: make_model_provider(model_key=key, n_ctx=n_ctx)
+        for key in dict.fromkeys(agent_model_keys)
+    }
+    agent_providers = [provider_cache[key] for key in agent_model_keys]
+    records: list[dict[str, Any]] = []
+    summary_accumulator = SummaryAccumulator()
     results_path = out_dir / "results.jsonl"
-    with results_path.open("w", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(json.dumps(record) + "\n")
+    use_parallel_executor = _should_parallelize_agents(agent_model_keys, parallel_agents)
+    executor = (
+        ThreadPoolExecutor(max_workers=agent_count, thread_name_prefix="agentic-quant")
+        if use_parallel_executor
+        else None
+    )
+    try:
+        coordinators = {
+            mechanism: Coordinator(
+                build_agents_for_providers(
+                    agent_providers,
+                    role_overrides=(
+                        agent_roles
+                        if mechanism == "role"
+                        else [_neutral_agent_instruction(mechanism)] * agent_count
+                    ),
+                    descriptive_names=False,
+                ),
+                debate_rounds=debate_rounds,
+                voting_tie_breaker=voting_tie_breaker,
+                executor=executor,
+            )
+            for mechanism in mechanisms
+        }
 
-    summary = summarise(records)
-    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    (out_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+        # Stream every completed row to disk. A failed or interrupted long run
+        # therefore leaves valid JSONL up to the last completed coordination.
+        with results_path.open("w", encoding="utf-8") as handle:
+            for benchmark_name in benchmarks:
+                benchmark_limit = benchmark_limits.get(benchmark_name, limit) if benchmark_limits else limit
+                for item in load_benchmark(benchmark_name, limit=benchmark_limit):
+                    for mechanism in mechanisms:
+                        result = coordinators[mechanism].run(item, mechanism)
+                        record = result.to_dict()
+                        summary_accumulator.add(record)
+                        if retain_records:
+                            records.append(record)
+                        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+                        handle.flush()
+                        if on_record:
+                            on_record(record)
+                        if echo:
+                            status = "ok" if result.correct else "miss"
+                            print(
+                                f"{benchmark_name:14s} {item.item_id:10s} {mechanism:7s} "
+                                f"{status:4s} pred={result.final_answer_display!r} gold={result.gold_display!r} "
+                                f"agents={agent_count} tokens={result.total_tokens} time={result.elapsed_s:.3f}s"
+                            )
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True, cancel_futures=True)
+
+    summary = summary_accumulator.snapshot()
+    _atomic_write_json(out_dir / "summary.json", summary)
     return {
         "out_dir": str(out_dir),
         "results_path": str(results_path),
@@ -142,7 +172,10 @@ def main() -> None:
     parser.add_argument("--mechanisms", nargs="+", default=["voting", "role", "debate"], choices=["voting", "role", "debate"])
     parser.add_argument("--limit", type=int, default=None, help="Limit items per benchmark for quick tests.")
     parser.add_argument("--debate-rounds", type=int, default=2)
+    parser.add_argument("--voting-tie-breaker", choices=["confidence", "first"], default="confidence")
     parser.add_argument("--agents", type=int, default=3, help="Number of agents to create, from 1 to 12.")
+    parser.add_argument("--agent-roles", nargs="*", help="Optional role label for each agent in role-based coordination.")
+    parser.add_argument("--sequential-agents", action="store_true", help="Disable parallel independent agent calls.")
     parser.add_argument("--out", default="runs/latest")
     args = parser.parse_args()
 
@@ -160,7 +193,10 @@ def main() -> None:
         mechanisms=args.mechanisms,
         limit=args.limit,
         debate_rounds=args.debate_rounds,
+        voting_tie_breaker=args.voting_tie_breaker,
         agent_count=args.agents,
+        agent_roles=args.agent_roles,
+        parallel_agents=not args.sequential_agents,
         out=args.out,
         echo=True,
     )
@@ -180,12 +216,84 @@ def _normalise_agent_models(model_key: str, agent_model_keys: list[str] | None, 
     return padded
 
 
+def _validate_run_configuration(
+    *,
+    benchmarks: list[str],
+    mechanisms: list[str],
+    limit: int | None,
+    benchmark_limits: dict[str, int | None] | None,
+    debate_rounds: int,
+    voting_tie_breaker: str,
+    agent_count: int,
+    agent_roles: list[str] | None,
+    n_ctx: int,
+) -> None:
+    integer_fields = {
+        "agent_count": agent_count,
+        "debate_rounds": debate_rounds,
+        "n_ctx": n_ctx,
+    }
+    if limit is not None:
+        integer_fields["limit"] = limit
+    for name, value in integer_fields.items():
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{name} must be an integer")
+    unknown_benchmarks = sorted(set(benchmarks) - set(available_benchmarks()))
+    if unknown_benchmarks:
+        raise ValueError(f"Unknown benchmarks: {', '.join(unknown_benchmarks)}")
+    allowed_mechanisms = {"voting", "role", "debate"}
+    unknown_mechanisms = sorted(set(mechanisms) - allowed_mechanisms)
+    if unknown_mechanisms:
+        raise ValueError(f"Unknown mechanisms: {', '.join(unknown_mechanisms)}")
+    if not benchmarks or not mechanisms:
+        raise ValueError("At least one benchmark and one mechanism are required")
+    if agent_count < 1 or agent_count > 12:
+        raise ValueError("agent_count must be between 1 and 12")
+    if agent_roles is not None and len(agent_roles) != agent_count:
+        raise ValueError("agent_roles must contain one role per agent")
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be at least 1 when provided")
+    if debate_rounds < 0:
+        raise ValueError("debate_rounds cannot be negative")
+    if voting_tie_breaker not in {"confidence", "first"}:
+        raise ValueError("voting_tie_breaker must be 'confidence' or 'first'")
+    if n_ctx < 256:
+        raise ValueError("n_ctx must be at least 256")
+    for benchmark, value in (benchmark_limits or {}).items():
+        if benchmark not in benchmarks:
+            raise ValueError(f"benchmark_limits contains unselected benchmark {benchmark!r}")
+        if value is not None:
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"Limit for {benchmark} must be an integer")
+            if value < 1:
+                raise ValueError(f"Limit for {benchmark} must be at least 1")
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _neutral_agent_instruction(mechanism: str) -> str:
     if mechanism == "voting":
         return "independent quantitative problem solver"
     if mechanism == "debate":
         return "quantitative debate participant"
     return "quantitative problem solver"
+
+
+def _should_parallelize_agents(agent_model_keys: list[str], enabled: bool) -> bool:
+    if not enabled or len(agent_model_keys) < 2:
+        return False
+    unique_models = set(agent_model_keys)
+    # The demo provider completes in microseconds, while one shared GGUF context
+    # is deliberately serialized. Threads help when at least two distinct model
+    # providers can perform substantial inference at the same time.
+    return len(unique_models) > 1 and any(key != "demo" for key in unique_models)
 
 
 def _console_download_progress(model_key: str, done: int, total: int) -> None:

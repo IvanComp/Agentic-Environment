@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from collections import Counter, defaultdict
+from concurrent.futures import Executor
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -42,12 +43,24 @@ class CoordinationResult:
 class Coordinator:
     """Coordinator implementing the three cooperation patterns from the paper."""
 
-    def __init__(self, agents: list[Agent], *, debate_rounds: int = 2, voting_tie_breaker: str = "confidence") -> None:
+    def __init__(
+        self,
+        agents: list[Agent],
+        *,
+        debate_rounds: int = 2,
+        voting_tie_breaker: str = "confidence",
+        executor: Executor | None = None,
+    ) -> None:
         if not agents:
             raise ValueError("At least one agent is required.")
+        if debate_rounds < 0:
+            raise ValueError("debate_rounds cannot be negative")
+        if voting_tie_breaker not in {"confidence", "first"}:
+            raise ValueError("voting_tie_breaker must be 'confidence' or 'first'")
         self.agents = agents
         self.debate_rounds = debate_rounds
         self.voting_tie_breaker = voting_tie_breaker
+        self.executor = executor
 
     def run(self, item: BenchmarkItem, mechanism: str) -> CoordinationResult:
         if mechanism == "voting":
@@ -60,7 +73,7 @@ class Coordinator:
 
     def _run_voting(self, item: BenchmarkItem) -> CoordinationResult:
         started = time.perf_counter()
-        outputs = [agent.solve(item) for agent in self.agents]
+        outputs = self._solve_agents(self.agents, item)
         final_answer, confidence, agreement, tie = self._majority(item, outputs)
         final_evaluation = evaluate_answer(item, final_answer)
         trace = [
@@ -99,14 +112,12 @@ class Coordinator:
             agreement = self._agreement(item, outputs, solved.answer)
             return self._result(item, "role", solved.answer, solved.confidence, agreement, False, 0, outputs, trace, started)
 
-        worker_outputs: list[AgentOutput] = []
-        for worker_index, worker in enumerate(workers, start=1):
-            solve_context = (
-                f"Role-based worker step {worker_index}. Use this plan and solve from your role:\n"
-                f"{plan.rationale}"
-            )
-            solved = worker.solve(item, context=solve_context)
-            worker_outputs.append(solved)
+        worker_contexts = [
+            f"Role-based worker step {worker_index}. Use this plan and solve from your role:\n{plan.rationale}"
+            for worker_index in range(1, len(workers) + 1)
+        ]
+        worker_outputs = self._solve_agents(workers, item, contexts=worker_contexts)
+        for worker_index, solved in enumerate(worker_outputs, start=1):
             trace.append({"step": f"worker_{worker_index}", "output": self._output_dict(item, solved)})
 
         candidate_answer, candidate_confidence, _, candidate_tie = self._majority(item, worker_outputs)
@@ -127,7 +138,11 @@ class Coordinator:
 
     def _run_debate(self, item: BenchmarkItem) -> CoordinationResult:
         started = time.perf_counter()
-        current = [agent.solve(item, context="Debate round 0: produce an independent initial answer.") for agent in self.agents]
+        current = self._solve_agents(
+            self.agents,
+            item,
+            context="Debate round 0: produce an independent initial answer.",
+        )
         trace: list[dict[str, Any]] = [
             {
                 "step": "initial",
@@ -141,7 +156,7 @@ class Coordinator:
                 f"Debate round {round_index}. Review peer answers and revise if their evidence is stronger:\n"
                 f"{outputs_to_context(current)}"
             )
-            current = [agent.solve(item, context=context) for agent in self.agents]
+            current = self._solve_agents(self.agents, item, context=context)
             rounds_used = round_index
             trace.append(
                 {
@@ -264,6 +279,28 @@ class Coordinator:
             return 0.0
         target = canonical_answer(item, answer)
         return sum(1 for output in outputs if canonical_answer(item, output.answer) == target) / len(outputs)
+
+    def _solve_agents(
+        self,
+        agents: list[Agent],
+        item: BenchmarkItem,
+        *,
+        context: str = "",
+        contexts: list[str] | None = None,
+    ) -> list[AgentOutput]:
+        if not agents:
+            return []
+        resolved_contexts = contexts if contexts is not None else [context] * len(agents)
+        if len(resolved_contexts) != len(agents):
+            raise ValueError("One context is required for each agent")
+        if self.executor is None or len(agents) == 1:
+            return [agent.solve(item, context=agent_context) for agent, agent_context in zip(agents, resolved_contexts, strict=True)]
+        return list(
+            self.executor.map(
+                lambda pair: pair[0].solve(item, context=pair[1]),
+                zip(agents, resolved_contexts, strict=True),
+            )
+        )
 
     @staticmethod
     def _output_dict(

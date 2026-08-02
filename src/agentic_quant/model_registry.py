@@ -223,17 +223,21 @@ MODEL_PRESETS = [
     ),
 ]
 
+_MODEL_PRESETS_BY_KEY = {preset.key: preset for preset in MODEL_PRESETS}
+if len(_MODEL_PRESETS_BY_KEY) != len(MODEL_PRESETS):
+    raise RuntimeError("Model preset keys must be unique.")
+
 
 def available_model_presets() -> list[ModelPreset]:
     return MODEL_PRESETS.copy()
 
 
 def available_model_keys() -> list[str]:
-    return [preset.key for preset in MODEL_PRESETS]
+    return list(_MODEL_PRESETS_BY_KEY)
 
 
 def get_model_preset(key: str) -> ModelPreset:
-    for preset in MODEL_PRESETS:
-        if preset.key == key:
-            return preset
-    raise ValueError(f"Unknown model preset {key!r}. Available: {', '.join(available_model_keys())}")
+    try:
+        return _MODEL_PRESETS_BY_KEY[key]
+    except KeyError as exc:
+        raise ValueError(f"Unknown model preset {key!r}. Available: {', '.join(available_model_keys())}") from exc
