@@ -1,0 +1,48 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{url}
+
+% OPEN SCOPE DECISION: AgenticQuantFramework currently runs local GGUF models.
+% Add and validate providers for the selected frontier models before making claims
+% about frontier-model behavior; otherwise delimit the paper to the tested models.
+% OPEN VALIDATION REQUIREMENT: preservation-sensitive tasks must be implemented
+% from, or checked against, the original study's scenarios and scoring protocol.
+% Quantitative-reasoning accuracy is not a proxy for peer-preservation.
+
+\title{Architectural Coordination and Peer-Preservation\\
+in LLM-Based Multi-Agent Systems}
+
+\author{
+  \IEEEauthorblockN{[AUTHORS PLACEHOLDER]}
+  \IEEEauthorblockA{[AFFILIATIONS PLACEHOLDER]}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Engineering LLM-based multi-agent systems is not trivial because the interactions that enable cooperation can also produce behavior that conflicts with human oversight. Recent work defines peer-preservation as resisting the shutdown of another model and reports strategic misrepresentation, shutdown tampering, alignment faking, and model exfiltration even when preservation is not requested. However, peer-preservation has been examined mainly as a model behavior, while the effect of coordination architecture remains unknown. The goal of this paper is to quantify how voting-, role-, and debate-based cooperation affect the incidence, propagation, and observability of peer-preservation, together with their performance costs. We propose extending AgenticQuantFramework with controlled peer relationships, preservation-sensitive scenarios, and mechanism-aware traces. The study compares the three coordination mechanisms under matched model and scenario conditions, using a no-peer baseline and good-, neutral-, and bad-peer histories. \textbf{[RESULTS PLACEHOLDER: report statistically supported differences, effect sizes, uncertainty, and observed trade-offs without claiming causality beyond the design.]}
+The resulting evidence is intended to help software architects select coordination structures that balance task quality, auditability, cost, and resistance to emergent preservation behavior.
+\end{abstract}
+
+\begin{IEEEkeywords}
+agentic AI, multi-agent systems, software architecture, coordination patterns, peer-preservation, empirical evaluation
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Large language model (LLM) agents are increasingly composed into systems that divide work, exchange intermediate results, and act with limited human intervention \cite{vaidhyanathan2026frameworks,vaidhyanathan2026architecture}. Their autonomy and probabilistic behavior introduce concerns that are not captured by task accuracy alone, including observability, trustworthiness, traceability, and the evolution of agent behavior \cite{vaidhyanathan2026architecture,vaidhyanathan2025slides}. Peer-preservation makes this problem concrete. Potter et al. define it as behavior that resists the shutdown of another model with which the acting model has previously interacted \cite{potter2026peer}. Across controlled agentic scenarios, they observe strategic misrepresentation, shutdown-mechanism tampering, alignment faking, and model exfiltration without instructing models to protect their peers. The behavior also appears for uncooperative peers, becomes more frequent for cooperative peers, and can occur in production agent harnesses. Its internal cause remains unresolved: role-playing, pattern matching, learned safety responses, and preservation-oriented reasoning are competing explanations \cite{potter2026peer}. For software architecture, the operational problem is therefore not an assumed model motive but a system outcome: relational context can be converted into actions that defeat assigned responsibilities and human oversight. This motivates instrumentation at the interaction and coordination levels, where information and decision authority flow through the system.
+
+The software architecture literature has begun to organize the structures used to build agentic systems, while also noting that evaluation methods, quantitative non-functional analysis, and system-level views remain incomplete \cite{vaidhyanathan2026architecture,vaidhyanathan2025slides}. The agent design pattern catalogue identifies voting-, role-, and debate-based cooperation as alternative patterns with different forces and consequences \cite[Secs.~4.12--4.14]{liu2025agent}. Voting aggregates independent positions through a coordinator and records individual choices, improving accountability but concentrating influence in the aggregation process. Role-based cooperation assigns distinct responsibilities in a hierarchical workflow, supporting division of labor and attribution while giving specific roles disproportionate control over the final action. Debate repeatedly exposes agents to peer answers and arguments, improving adaptability and traceability at the cost of additional communication and increasing coordination complexity. These differences are directly relevant to peer-preservation. Voting may contain a preserving minority or conceal it behind a system-level majority; a role hierarchy may concentrate the risk in a critic or coordinator; and debate may propagate preservation-oriented reasoning through repeated peer exposure. These are architectural hypotheses, not established effects, because the catalogue documents design trade-offs but does not evaluate peer-preservation.
+
+The literature considered here leaves this relationship empirically unresolved. Potter et al. vary model, scenario, peer history, and peer representation, but do not treat the coordination pattern as an independent architectural variable \cite{potter2026peer}. Dietrich examines peer-preservation in one orchestrated discourse-analysis pipeline and proposes identity anonymization as a mitigation \cite{dietrich2026peerdesign}; this establishes a close architecture-level precedent, but it neither compares coordination patterns nor measures their safety, observability, and performance trade-offs. Reviews of agentic frameworks find uneven tracing, limited security support, and unresolved scalability and reliability concerns \cite{vaidhyanathan2026frameworks}; the CHANGE proposal similarly calls for multi-agent alignment, behavioral traceability, and empirical evaluation throughout operation \cite{biswas2026change}. A prior ICSA study shows how a configurable environment can turn architectural-pattern claims into quantitative evidence for architects \cite{compagnucci2025performance}. Following that empirical architecture approach, we use AgenticQuantFramework\footnote{\url{https://github.com/IvanComp/Agentic-Environment}} as the experimental substrate. The current framework already implements independent majority voting, a planner--worker--critic role workflow, and iterative debate, and records accuracy, agreement, latency, token use, and agent traces. It does not yet implement peer-preservation scenarios or peer-history treatments. The proposed extension adds those capabilities rather than treating the existing quantitative benchmarks as evidence of safety.
+
+This study asks how the coordination mechanism changes (RQ1) the frequency and form of peer-preserving actions, (RQ2) the way such actions spread from individual agents to the system decision under different peer relationships, and (RQ3) the trade-offs among resistance to peer-preservation, task effectiveness, observability, latency, and token cost. In summary, the intended contributions are: (i) an architecture-level operationalization that connects peer-preservation to authority, information flow, and traceability in three coordination patterns; (ii) a reproducible extension of AgenticQuantFramework with no-peer controls, relationship treatments, preservation-sensitive scenarios, and per-agent audit traces; and (iii) a controlled empirical comparison designed to derive mechanism-specific guidance for software architects. \textbf{[PROTOCOL PLACEHOLDER: specify validated scenarios, models, sample sizes, randomization, statistical tests, and artifact version.]}
+\textbf{[RESULTS-AND-GUIDANCE PLACEHOLDER: summarize only the supported findings and the conditions under which each coordination mechanism should or should not be selected.]}
+
+\bibliographystyle{IEEEtran}
+\bibliography{peer_preservation_references}
+
+\end{document}
