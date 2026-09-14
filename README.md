@@ -38,15 +38,33 @@ Included presets:
 
 Kimi is not included as a default reviewer preset because the currently practical open GGUF releases are far above this project's light setup target: Kimi K2-family GGUF models are around 1T total parameters with about 32B active parameters and very large memory requirements. They can be added later as external heavy experiments, but they do not fit the "up to 20B and easy to rerun" constraint.
 
-## Quick Setup
+## Linux setup
+
+The commands below are for Ubuntu and Debian. Install Python, support for virtual environments, and the build tools needed by `llama-cpp-python`:
 
 ```bash
-cd /Users/ivan/Desktop/Agentic-Environment
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip python3-dev build-essential cmake
+```
+
+Open the project directory and create a new virtual environment. Do not reuse a `.venv` copied from macOS or Windows because virtual environments contain platform-specific executables.
+
+```bash
+cd /path/to/Agentic-Environment
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -e .
+python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
 ```
+
+On Fedora, install the equivalent packages with:
+
+```bash
+sudo dnf install -y python3 python3-pip python3-devel gcc gcc-c++ make cmake
+```
+
+Then create the virtual environment and run the same `pip` commands shown above.
 
 Immediate no-download smoke test:
 
@@ -54,21 +72,22 @@ Immediate no-download smoke test:
 agentic-quant --model demo --out runs/latest
 ```
 
-Minimal real-LLM setup for reviewers:
+Minimal real-LLM test for reviewers:
 
 ```bash
-python -m pip install -e ".[llm]"
 agentic-quant --model qwen2.5-0.5b --download-model --limit 2 --out runs/qwen_smoke
 ```
+
+The first command downloads the selected GGUF model. The file is cached under `models/`, so later runs do not need to download it again.
 
 ## Local UI
 
 The UI uses no extra web framework: it is a small Python standard-library `http.server` app with vanilla HTML and JavaScript.
 
 ```bash
-cd /Users/ivan/Desktop/Agentic-Environment
+cd /path/to/Agentic-Environment
 source .venv/bin/activate
-agentic-quant-ui
+agentic-quant-ui --no-browser
 ```
 
 Open the URL shown in the terminal, by default:
@@ -76,6 +95,14 @@ Open the URL shown in the terminal, by default:
 ```text
 http://127.0.0.1:8765
 ```
+
+The `--no-browser` option is useful on a Linux server without a desktop. If the program runs on another machine, create an SSH tunnel instead of exposing the development server directly:
+
+```bash
+ssh -L 8765:127.0.0.1:8765 user@linux-host
+```
+
+Then open `http://127.0.0.1:8765` in the browser on your computer.
 
 From the UI you can choose:
 
