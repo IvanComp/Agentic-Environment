@@ -155,7 +155,7 @@ class GgufModelProvider:
         except ImportError as exc:
             raise RuntimeError(
                 "llama-cpp-python is missing. Install the LLM dependencies with: "
-                "python -m pip install -e \".[llm]\""
+                "python -m pip install -r requirements.txt"
             ) from exc
 
         if not self.preset.repo_id or not self.preset.filename:
@@ -167,7 +167,12 @@ class GgufModelProvider:
                 f"The model {self.preset.label} is not downloaded. "
                 "Download it from the UI or rerun with --download-model."
             )
-        return Llama(model_path=str(model_path(self.model_key)), n_ctx=self.n_ctx, verbose=False)
+        return Llama(
+            model_path=str(model_path(self.model_key)),
+            n_ctx=self.n_ctx,
+            n_gpu_layers=-1,
+            verbose=False,
+        )
 
     def _complete(self, prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
         system = (

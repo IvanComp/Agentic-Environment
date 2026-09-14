@@ -56,15 +56,8 @@ source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
+agentic-quant-ui
 ```
-
-On Fedora, install the equivalent packages with:
-
-```bash
-sudo dnf install -y python3 python3-pip python3-devel gcc gcc-c++ make cmake
-```
-
-Then create the virtual environment and run the same `pip` commands shown above.
 
 Immediate no-download smoke test:
 

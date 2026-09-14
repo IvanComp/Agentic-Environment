@@ -1352,6 +1352,7 @@ INDEX_HTML = r"""<!doctype html>
     <form id="experiment-form">
       <section>
         <h2>Experiment</h2>
+        <p class="hint">GPU acceleration is used automatically when supported by the installed llama-cpp-python backend; otherwise the models run on CPU.</p>
         <div class="inline">
           <div>
             <label for="agent-count">Number of agents</label>
