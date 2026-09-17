@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from agentic_quant.install_cuda import parse_driver_cuda_version, select_cuda_wheel
+from agentic_quant.install_cuda import (
+    cuda_runtime_packages,
+    parse_driver_cuda_version,
+    select_cuda_wheel,
+)
 
 
 class CudaInstallerTest(unittest.TestCase):
@@ -19,6 +23,20 @@ class CudaInstallerTest(unittest.TestCase):
     def test_rejects_driver_older_than_available_wheels(self) -> None:
         with self.assertRaisesRegex(SystemExit, "oldest available wheel"):
             select_cuda_wheel((11, 7))
+
+    def test_selects_runtime_packages_for_cuda_major_version(self) -> None:
+        self.assertEqual(
+            cuda_runtime_packages("cu125"),
+            [
+                "nvidia-cuda-runtime-cu12",
+                "nvidia-cublas-cu12",
+                "nvidia-nvjitlink-cu12",
+            ],
+        )
+        self.assertEqual(
+            cuda_runtime_packages("cu118"),
+            ["nvidia-cuda-runtime-cu11", "nvidia-cublas-cu11"],
+        )
 
 
 if __name__ == "__main__":

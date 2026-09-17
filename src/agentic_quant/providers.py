@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import platform
 import shutil
 import subprocess
+import sysconfig
 import threading
 import time
 from dataclasses import dataclass
@@ -164,8 +166,9 @@ class GgufModelProvider:
 
     def _load_llm(self) -> Any:
         try:
+            _preload_cuda_libraries()
             import llama_cpp
-        except ImportError as exc:
+        except (ImportError, OSError) as exc:
             install_command = (
                 "agentic-quant-install-cuda"
                 if _nvidia_gpu_visible()
@@ -323,6 +326,32 @@ def _nvidia_gpu_visible() -> bool:
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def _preload_cuda_libraries() -> None:
+    """Expose CUDA runtime wheels to llama.cpp without a global CUDA Toolkit."""
+    if platform.system() != "Linux":
+        return
+    purelib = Path(sysconfig.get_paths()["purelib"])
+    nvidia_root = purelib / "nvidia"
+    library_patterns = (
+        "nvjitlink/lib/libnvJitLink.so*",
+        "cuda_runtime/lib/libcudart.so*",
+        "cublas/lib/libcublasLt.so*",
+        "cublas/lib/libcublas.so*",
+    )
+    loaded: set[Path] = set()
+    for pattern in library_patterns:
+        candidates = sorted(
+            (path for path in nvidia_root.glob(pattern) if path.is_file()),
+            key=lambda path: (path.is_symlink(), len(path.name), path.name),
+        )
+        for path in candidates:
+            resolved = path.resolve()
+            if resolved in loaded:
+                continue
+            ctypes.CDLL(str(resolved), mode=ctypes.RTLD_GLOBAL)
+            loaded.add(resolved)
 
 
 def _llama_backend_name(llama_cpp: Any) -> str:

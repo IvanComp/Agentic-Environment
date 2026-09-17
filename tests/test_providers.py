@@ -77,6 +77,18 @@ class GgufModelProviderTest(unittest.TestCase):
 
         llama.assert_not_called()
 
+    def test_missing_cuda_shared_library_points_to_cuda_installer(self) -> None:
+        provider = GgufModelProvider.__new__(GgufModelProvider)
+        with (
+            patch(
+                "agentic_quant.providers._preload_cuda_libraries",
+                side_effect=OSError("libcudart.so.12: cannot open shared object file"),
+            ),
+            patch("agentic_quant.providers._nvidia_gpu_visible", return_value=True),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "agentic-quant-install-cuda"):
+                provider._load_llm()
+
 
 if __name__ == "__main__":
     unittest.main()

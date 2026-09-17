@@ -49,6 +49,7 @@ def main() -> None:
 
     cuda_version = parse_driver_cuda_version(probe.stdout)
     wheel_tag = select_cuda_wheel(cuda_version)
+    runtime_packages = cuda_runtime_packages(wheel_tag)
     index_url = f"https://abetlen.github.io/llama-cpp-python/whl/{wheel_tag}"
     print(
         f"NVIDIA driver supports CUDA {cuda_version[0]}.{cuda_version[1]}; "
@@ -65,6 +66,7 @@ def main() -> None:
         "--prefer-binary",
         "--only-binary=llama-cpp-python",
         "llama-cpp-python>=0.2.90",
+        *runtime_packages,
         "--extra-index-url",
         index_url,
     ]
@@ -91,8 +93,24 @@ def select_cuda_wheel(cuda_version: tuple[int, int]) -> str:
     return compatible[-1]
 
 
+def cuda_runtime_packages(wheel_tag: str) -> list[str]:
+    match = re.fullmatch(r"cu(11|12|13)\d", wheel_tag)
+    if not match:
+        raise ValueError(f"Unsupported CUDA wheel tag: {wheel_tag}")
+    major = match.group(1)
+    packages = [
+        f"nvidia-cuda-runtime-cu{major}",
+        f"nvidia-cublas-cu{major}",
+    ]
+    if major != "11":
+        packages.append(f"nvidia-nvjitlink-cu{major}")
+    return packages
+
+
 def verify_cuda_backend() -> None:
     code = (
+        "from agentic_quant.providers import _preload_cuda_libraries; "
+        "_preload_cuda_libraries(); "
         "import llama_cpp; "
         "supported = bool(llama_cpp.llama_supports_gpu_offload()); "
         "info = llama_cpp.llama_print_system_info(); "
