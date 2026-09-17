@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import platform
+import shutil
+import subprocess
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from .model_registry import get_model_preset
@@ -163,9 +166,14 @@ class GgufModelProvider:
         try:
             import llama_cpp
         except ImportError as exc:
+            install_command = (
+                "agentic-quant-install-cuda"
+                if _nvidia_gpu_visible()
+                else "python -m pip install -r requirements.txt"
+            )
             raise RuntimeError(
                 "llama-cpp-python is missing. Install the LLM dependencies with: "
-                "python -m pip install -r requirements.txt"
+                f"{install_command}"
             ) from exc
 
         if not self.preset.repo_id or not self.preset.filename:
@@ -176,6 +184,12 @@ class GgufModelProvider:
             raise RuntimeError(
                 f"The model {self.preset.label} is not downloaded. "
                 "Download it from the UI or rerun with --download-model."
+            )
+        if _nvidia_gpu_visible() and not _gpu_offload_supported(llama_cpp):
+            raise RuntimeError(
+                "An NVIDIA GPU is available, but llama-cpp-python was installed without GPU offload. "
+                "Activate this virtual environment and reinstall the CUDA build with: "
+                "agentic-quant-install-cuda"
             )
         llm = llama_cpp.Llama(
             model_path=str(model_path(self.model_key)),
@@ -259,14 +273,7 @@ def _safe_token_count(value: Any, fallback_text: str) -> int:
 
 def _loaded_compute_unit(llama_cpp: Any, llm: Any) -> dict[str, Any]:
     """Describe the compute unit after a model has loaded successfully."""
-    supports_gpu = False
-    probe = getattr(llama_cpp, "llama_supports_gpu_offload", None)
-    if callable(probe):
-        try:
-            supports_gpu = bool(probe())
-        except Exception:
-            supports_gpu = False
-
+    supports_gpu = _gpu_offload_supported(llama_cpp)
     model_params = getattr(llm, "model_params", None)
     requested_gpu_layers = int(getattr(model_params, "n_gpu_layers", 0) or 0)
     if supports_gpu and requested_gpu_layers > 0:
@@ -285,6 +292,37 @@ def _loaded_compute_unit(llama_cpp: Any, llm: Any) -> dict[str, Any]:
         "label": f"CPU ({architecture})",
         "verified": True,
     }
+
+
+def _gpu_offload_supported(llama_cpp: Any) -> bool:
+    probe = getattr(llama_cpp, "llama_supports_gpu_offload", None)
+    if callable(probe):
+        try:
+            return bool(probe())
+        except Exception:
+            return False
+    return False
+
+
+def _nvidia_gpu_visible() -> bool:
+    if platform.system() != "Linux":
+        return False
+    if Path("/dev/nvidiactl").exists() or Path("/dev/nvidia0").exists():
+        return True
+    nvidia_smi = shutil.which("nvidia-smi")
+    if not nvidia_smi:
+        return False
+    try:
+        result = subprocess.run(
+            [nvidia_smi, "-L"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and bool(result.stdout.strip())
 
 
 def _llama_backend_name(llama_cpp: Any) -> str:

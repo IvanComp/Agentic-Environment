@@ -51,6 +51,32 @@ class GgufModelProviderTest(unittest.TestCase):
         self.assertIn("updateComputeUnit(job)", INDEX_HTML)
         self.assertLess(INDEX_HTML.index(indicator), INDEX_HTML.index("Number of agents"))
 
+    def test_linux_nvidia_gpu_rejects_a_cpu_only_llama_build(self) -> None:
+        llama = Mock()
+        llama_module = SimpleNamespace(
+            Llama=llama,
+            llama_supports_gpu_offload=lambda: False,
+            llama_print_system_info=lambda: b"CPU : AVX2 = 1",
+        )
+        provider = GgufModelProvider.__new__(GgufModelProvider)
+        provider.model_key = "test-model"
+        provider.n_ctx = 2048
+        provider.preset = SimpleNamespace(
+            label="Test model",
+            repo_id="example/model",
+            filename="model.gguf",
+        )
+
+        with (
+            patch.dict(sys.modules, {"llama_cpp": llama_module}),
+            patch("agentic_quant.providers.model_status", return_value={"downloaded": True}),
+            patch("agentic_quant.providers._nvidia_gpu_visible", return_value=True),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "agentic-quant-install-cuda"):
+                provider._load_llm()
+
+        llama.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

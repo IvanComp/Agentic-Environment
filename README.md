@@ -54,9 +54,40 @@ cd /path/to/Agentic-Environment
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
+```
+
+### NVIDIA GPU with CUDA
+
+Check that the NVIDIA driver sees the GPU:
+
+```bash
+nvidia-smi
+```
+
+Install the prebuilt CUDA package selected for the driver on this machine. This does not require `nvcc` or the full CUDA Toolkit:
+
+```bash
+python -m pip install -e . --no-deps
+agentic-quant-install-cuda
+```
+
+The installer reads the CUDA version supported by `nvidia-smi`, replaces any CPU-only installation, and verifies the new backend. Start the UI after it finishes:
+
+```bash
+agentic-quant-ui
+```
+
+Run an experiment with a real model. The compute-unit indicator must report `GPU (CUDA)`. If an NVIDIA GPU is visible but the installed package has no GPU backend, the experiment now stops with an installation command instead of running slowly on the CPU.
+
+`requirements-cuda.txt` remains available as a source-build fallback. Use it only when no compatible prebuilt wheel exists; that route requires the CUDA Toolkit and `nvcc`.
+
+### CPU-only Linux
+
+For a Linux computer without an NVIDIA GPU:
+
+```bash
 python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
-agentic-quant-ui
 ```
 
 Immediate no-download smoke test:
