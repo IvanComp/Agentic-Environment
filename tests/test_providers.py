@@ -12,7 +12,13 @@ from agentic_quant.web_ui import INDEX_HTML
 
 class GgufModelProviderTest(unittest.TestCase):
     def test_load_requests_all_available_gpu_layers(self) -> None:
-        llama = Mock(return_value=object())
+        loaded_model = SimpleNamespace(model_params=SimpleNamespace(n_gpu_layers=2_147_483_647))
+        llama = Mock(return_value=loaded_model)
+        llama_module = SimpleNamespace(
+            Llama=llama,
+            llama_supports_gpu_offload=lambda: True,
+            llama_print_system_info=lambda: b"MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1",
+        )
         provider = GgufModelProvider.__new__(GgufModelProvider)
         provider.model_key = "test-model"
         provider.n_ctx = 2048
@@ -23,7 +29,7 @@ class GgufModelProviderTest(unittest.TestCase):
         )
 
         with (
-            patch.dict(sys.modules, {"llama_cpp": SimpleNamespace(Llama=llama)}),
+            patch.dict(sys.modules, {"llama_cpp": llama_module}),
             patch("agentic_quant.providers.model_status", return_value={"downloaded": True}),
             patch("agentic_quant.providers.model_path", return_value=Path("/models/model.gguf")),
         ):
@@ -35,11 +41,15 @@ class GgufModelProviderTest(unittest.TestCase):
             n_gpu_layers=-1,
             verbose=False,
         )
+        self.assertEqual(provider.compute_unit["kind"], "gpu")
+        self.assertEqual(provider.compute_unit["label"], "GPU (Metal)")
+        self.assertTrue(provider.compute_unit["verified"])
 
-    def test_gpu_notice_is_shown_above_agent_count(self) -> None:
-        notice = "GPU acceleration is used automatically"
-        self.assertIn(notice, INDEX_HTML)
-        self.assertLess(INDEX_HTML.index(notice), INDEX_HTML.index("Number of agents"))
+    def test_compute_unit_indicator_is_shown_above_agent_count(self) -> None:
+        indicator = 'id="compute-unit"'
+        self.assertIn(indicator, INDEX_HTML)
+        self.assertIn("updateComputeUnit(job)", INDEX_HTML)
+        self.assertLess(INDEX_HTML.index(indicator), INDEX_HTML.index("Number of agents"))
 
 
 if __name__ == "__main__":

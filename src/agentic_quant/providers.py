@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import threading
 import time
 from dataclasses import dataclass
@@ -43,6 +44,15 @@ class HeuristicProvider:
     """
 
     name = "heuristic"
+
+    def __init__(self) -> None:
+        architecture = platform.machine() or "unknown architecture"
+        self.compute_unit = {
+            "kind": "cpu",
+            "backend": "Python",
+            "label": f"CPU ({architecture})",
+            "verified": True,
+        }
 
     def generate(
         self,
@@ -151,7 +161,7 @@ class GgufModelProvider:
 
     def _load_llm(self) -> Any:
         try:
-            from llama_cpp import Llama
+            import llama_cpp
         except ImportError as exc:
             raise RuntimeError(
                 "llama-cpp-python is missing. Install the LLM dependencies with: "
@@ -167,12 +177,14 @@ class GgufModelProvider:
                 f"The model {self.preset.label} is not downloaded. "
                 "Download it from the UI or rerun with --download-model."
             )
-        return Llama(
+        llm = llama_cpp.Llama(
             model_path=str(model_path(self.model_key)),
             n_ctx=self.n_ctx,
             n_gpu_layers=-1,
             verbose=False,
         )
+        self.compute_unit = _loaded_compute_unit(llama_cpp, llm)
+        return llm
 
     def _complete(self, prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
         system = (
@@ -243,6 +255,61 @@ def _safe_token_count(value: Any, fallback_text: str) -> int:
     except (TypeError, ValueError):
         return estimate_tokens(fallback_text)
     return max(0, count)
+
+
+def _loaded_compute_unit(llama_cpp: Any, llm: Any) -> dict[str, Any]:
+    """Describe the compute unit after a model has loaded successfully."""
+    supports_gpu = False
+    probe = getattr(llama_cpp, "llama_supports_gpu_offload", None)
+    if callable(probe):
+        try:
+            supports_gpu = bool(probe())
+        except Exception:
+            supports_gpu = False
+
+    model_params = getattr(llm, "model_params", None)
+    requested_gpu_layers = int(getattr(model_params, "n_gpu_layers", 0) or 0)
+    if supports_gpu and requested_gpu_layers > 0:
+        backend = _llama_backend_name(llama_cpp)
+        return {
+            "kind": "gpu",
+            "backend": backend,
+            "label": f"GPU ({backend})",
+            "verified": True,
+        }
+
+    architecture = platform.machine() or "unknown architecture"
+    return {
+        "kind": "cpu",
+        "backend": "CPU",
+        "label": f"CPU ({architecture})",
+        "verified": True,
+    }
+
+
+def _llama_backend_name(llama_cpp: Any) -> str:
+    info_function = getattr(llama_cpp, "llama_print_system_info", None)
+    if not callable(info_function):
+        return "GPU"
+    try:
+        raw_info = info_function()
+    except Exception:
+        return "GPU"
+    if isinstance(raw_info, bytes):
+        system_info = raw_info.decode("utf-8", errors="replace").upper()
+    else:
+        system_info = str(raw_info).upper()
+    for marker, label in (
+        ("CUDA", "CUDA"),
+        ("ROCM", "ROCm"),
+        ("HIP", "ROCm/HIP"),
+        ("VULKAN", "Vulkan"),
+        ("SYCL", "SYCL"),
+        ("MTL", "Metal"),
+    ):
+        if marker in system_info:
+            return label
+    return "GPU"
 
 
 def _solve_gsm8k_style(question: str) -> tuple[str, str]:

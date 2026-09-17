@@ -475,6 +475,7 @@ def _start_run_job(config: dict[str, Any]) -> str:
         "downloadPercent": 0,
         "currentModel": "",
         "currentLabel": "",
+        "computeUnits": [],
         "error": "",
         "_summary_accumulator": SummaryAccumulator(),
         "_created_at": time.time(),
@@ -535,6 +536,10 @@ def _run_worker(job_id: str, config: dict[str, Any]) -> None:
             job["status"] = "running"
             job["message"] = f"Completed {record['item_id']} / {record['mechanism']}."
 
+    def on_compute_units(compute_units: list[dict[str, Any]]) -> None:
+        with RUN_LOCK:
+            RUN_JOBS[job_id]["computeUnits"] = copy.deepcopy(compute_units)
+
     try:
         with RUN_LOCK:
             RUN_JOBS[job_id].update({"status": "running", "message": "Starting experiment."})
@@ -542,6 +547,7 @@ def _run_worker(job_id: str, config: dict[str, Any]) -> None:
             **config,
             echo=False,
             on_record=on_record,
+            on_compute_units=on_compute_units,
             download_progress=download_progress,
         )
         with RUN_LOCK:
@@ -902,6 +908,33 @@ INDEX_HTML = r"""<!doctype html>
       color: var(--muted);
       font-size: 12px;
     }
+    .compute-unit {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 8px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #f8faf8;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .compute-unit strong {
+      color: var(--muted);
+      text-align: right;
+    }
+    .compute-unit.gpu {
+      border-color: #9dd8c0;
+      background: #e7f6ee;
+    }
+    .compute-unit.gpu strong { color: var(--good); }
+    .compute-unit.cpu {
+      border-color: #f1c98b;
+      background: #fff4e5;
+    }
+    .compute-unit.cpu strong { color: var(--warn); }
     .agent-list {
       display: grid;
       gap: 5px;
@@ -1352,7 +1385,10 @@ INDEX_HTML = r"""<!doctype html>
     <form id="experiment-form">
       <section>
         <h2>Experiment</h2>
-        <p class="hint">GPU acceleration is used automatically when supported by the installed llama-cpp-python backend; otherwise the models run on CPU.</p>
+        <div id="compute-unit" class="compute-unit">
+          <span>Compute unit</span>
+          <strong id="compute-unit-value">Not active</strong>
+        </div>
         <div class="inline">
           <div>
             <label for="agent-count">Number of agents</label>
@@ -2068,6 +2104,7 @@ INDEX_HTML = r"""<!doctype html>
       event.preventDefault();
       $('run-button').disabled = true;
       $('status').textContent = 'Starting...';
+      updateComputeUnit({status: 'queued', computeUnits: []});
       $('empty').style.display = 'none';
       $('results').style.display = 'block';
       render({summary: {overall: {question_count: 0, accuracy: 0, mean_elapsed_s: 0, mean_total_tokens: 0}, by_benchmark_mechanism: []}, records: [], interactions: [], resultsPath: ''});
@@ -2138,6 +2175,7 @@ INDEX_HTML = r"""<!doctype html>
 
     function updateRunProgress(job) {
       $('status').textContent = job.message || job.status;
+      updateComputeUnit(job);
       if (job.status === 'downloading') {
         $('download-progress').style.display = 'block';
         $('download-bar').style.width = `${job.downloadPercent || 0}%`;
@@ -2157,6 +2195,25 @@ INDEX_HTML = r"""<!doctype html>
       $('download-text').textContent = total
         ? `${job.message || 'Running.'} ${completed} / ${total}`
         : (job.message || 'Running.');
+    }
+
+    function updateComputeUnit(job) {
+      const container = $('compute-unit');
+      const value = $('compute-unit-value');
+      const units = Array.isArray(job.computeUnits) ? job.computeUnits : [];
+      container.classList.remove('gpu', 'cpu');
+      if (!units.length) {
+        value.textContent = job.status === 'queued' || job.status === 'running'
+          ? 'Detecting...'
+          : 'Not active';
+        return;
+      }
+      const kinds = new Set(units.map((unit) => unit.kind));
+      const labels = [...new Set(units.map((unit) => unit.label).filter(Boolean))];
+      const suffix = job.status === 'done' ? 'used' : 'active';
+      value.textContent = `${labels.join(' + ')} · ${suffix}`;
+      if (kinds.has('gpu')) container.classList.add('gpu');
+      else container.classList.add('cpu');
     }
 
     function downloadMessage(job) {

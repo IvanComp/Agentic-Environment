@@ -34,6 +34,7 @@ def run_experiment(
     out: str | Path = "runs/latest",
     echo: bool = True,
     on_record: Callable[[dict[str, Any]], None] | None = None,
+    on_compute_units: Callable[[list[dict[str, Any]]], None] | None = None,
     download_progress: Callable[[str, int, int], None] | None = None,
     parallel_agents: bool = True,
     retain_records: bool = True,
@@ -89,6 +90,11 @@ def run_experiment(
         key: make_model_provider(model_key=key, n_ctx=n_ctx)
         for key in dict.fromkeys(agent_model_keys)
     }
+    compute_units = _provider_compute_units(list(provider_cache.values()))
+    config["compute_units"] = compute_units
+    _atomic_write_json(out_dir / "config.json", config)
+    if on_compute_units:
+        on_compute_units(compute_units)
     agent_providers = [provider_cache[key] for key in agent_model_keys]
     records: list[dict[str, Any]] = []
     summary_accumulator = SummaryAccumulator()
@@ -214,6 +220,21 @@ def _normalise_agent_models(model_key: str, agent_model_keys: list[str] | None, 
     padded = list(agent_model_keys)
     padded.extend([model_key] * (agent_count - len(padded)))
     return padded
+
+
+def _provider_compute_units(providers: list[Any]) -> list[dict[str, Any]]:
+    units: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for provider in providers:
+        unit = getattr(provider, "compute_unit", None)
+        if not isinstance(unit, dict):
+            continue
+        identity = (str(unit.get("kind", "")), str(unit.get("backend", "")))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        units.append(dict(unit))
+    return units
 
 
 def _validate_run_configuration(

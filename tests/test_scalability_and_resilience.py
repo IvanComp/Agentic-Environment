@@ -120,6 +120,24 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
         self.assertEqual(len(observed), 2)
         self.assertEqual(result["summary"]["overall"]["n"], 2)
 
+    def test_run_reports_the_compute_unit_after_provider_initialisation(self) -> None:
+        observed_units = []
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = run_experiment(
+                model_key="demo",
+                benchmarks=["gsm8k_mini"],
+                mechanisms=["voting"],
+                limit=1,
+                out=Path(tmp_dir) / "compute-unit",
+                echo=False,
+                on_compute_units=observed_units.append,
+            )
+
+        self.assertEqual(len(observed_units), 1)
+        self.assertEqual(observed_units[0][0]["kind"], "cpu")
+        self.assertTrue(observed_units[0][0]["verified"])
+        self.assertEqual(result["config"]["compute_units"], observed_units[0])
+
     def test_invalid_run_configuration_fails_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             with self.assertRaisesRegex(ValueError, "Unknown mechanisms"):
