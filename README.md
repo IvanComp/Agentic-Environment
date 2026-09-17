@@ -50,7 +50,6 @@ sudo apt install -y python3 python3-venv python3-pip python3-dev build-essential
 Open the project directory and create a new virtual environment. Do not reuse a `.venv` copied from macOS or Windows because virtual environments contain platform-specific executables.
 
 ```bash
-cd /path/to/Agentic-Environment
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
@@ -58,35 +57,6 @@ python -m pip install -e . --no-deps
 agentic-quant-install-cuda
 agentic-quant-ui
 ```
-
-The CUDA installer uses `nvidia-smi` to choose a compatible prebuilt package. It also installs `libcudart`, cuBLAS, and the other runtime libraries inside the virtual environment, so this path does not require `nvcc` or a system-wide CUDA Toolkit.
-
-Run an experiment with a real model. The compute-unit indicator must report `GPU (CUDA)`. If an NVIDIA GPU is visible but the installed package has no GPU backend, the experiment now stops with an installation command instead of running slowly on the CPU.
-
-`requirements-cuda.txt` remains available as a source-build fallback. Use it only when no compatible prebuilt wheel exists; that route requires the CUDA Toolkit and `nvcc`.
-
-### CPU-only Linux
-
-For a Linux computer without an NVIDIA GPU:
-
-```bash
-python -m pip install -r requirements.txt
-python -m pip install -e . --no-deps
-```
-
-Immediate no-download smoke test:
-
-```bash
-agentic-quant --model demo --out runs/latest
-```
-
-Minimal real-LLM test for reviewers:
-
-```bash
-agentic-quant --model qwen2.5-0.5b --download-model --limit 2 --out runs/qwen_smoke
-```
-
-The first command downloads the selected GGUF model. The file is cached under `models/`, so later runs do not need to download it again.
 
 ## Local UI
 

@@ -940,6 +940,22 @@ INDEX_HTML = r"""<!doctype html>
       gap: 5px;
       margin-top: 6px;
     }
+    .agent-count-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 8px;
+    }
+    button.copy-agent-model {
+      min-height: 32px;
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    button.copy-agent-model.copied {
+      border-color: #9dd8c0;
+      background: #e7f6ee;
+      color: var(--good);
+    }
     .agent-row {
       display: grid;
       grid-template-columns: 52px minmax(0, 1fr);
@@ -1017,6 +1033,18 @@ INDEX_HTML = r"""<!doctype html>
       color: var(--ink);
     }
     button.secondary:hover { background: var(--soft); }
+    button.report-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 7px 12px;
+      background: linear-gradient(135deg, #0f766e, #155e75);
+      box-shadow: 0 5px 14px rgba(15, 118, 110, .18);
+    }
+    button.report-button:hover {
+      background: linear-gradient(135deg, #0b5f59, #164e63);
+    }
     button:disabled {
       cursor: wait;
       opacity: .65;
@@ -1330,6 +1358,266 @@ INDEX_HTML = r"""<!doctype html>
       border-radius: 5px;
       overflow-wrap: anywhere;
     }
+    body.modal-open { overflow: hidden; }
+    .visual-report-modal {
+      width: min(1180px, calc(100vw - 32px));
+      max-width: none;
+      max-height: calc(100vh - 32px);
+      margin: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      background: #f3f7f5;
+      color: var(--ink);
+      box-shadow: 0 28px 90px rgba(15, 35, 30, .32);
+      overflow: hidden;
+    }
+    .visual-report-modal::backdrop {
+      background: rgba(10, 24, 20, .68);
+      backdrop-filter: blur(5px);
+    }
+    .visual-report-shell {
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+    }
+    .visual-report-hero {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 24px 26px;
+      color: #fff;
+      background:
+        radial-gradient(circle at 82% -20%, rgba(94, 234, 212, .38), transparent 38%),
+        linear-gradient(128deg, #0b3b36 0%, #0f766e 52%, #155e75 100%);
+    }
+    .visual-report-eyebrow {
+      margin-bottom: 6px;
+      color: #99f6e4;
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .visual-report-hero h2 {
+      margin: 0;
+      font-size: clamp(23px, 3vw, 34px);
+      line-height: 1.1;
+    }
+    .visual-report-subtitle {
+      max-width: 720px;
+      margin: 8px 0 0;
+      color: rgba(255,255,255,.78);
+      font-size: 13px;
+    }
+    .visual-report-close {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      min-height: 38px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 999px;
+      background: rgba(255,255,255,.1);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .visual-report-close:hover { background: rgba(255,255,255,.2); }
+    .visual-report-body {
+      display: grid;
+      gap: 18px;
+      padding: 22px;
+    }
+    .report-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .report-meta-strip span {
+      padding: 6px 10px;
+      border: 1px solid #d7e4df;
+      border-radius: 999px;
+      background: rgba(255,255,255,.78);
+      color: #53645d;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .report-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 12px;
+    }
+    .report-kpi {
+      position: relative;
+      min-height: 122px;
+      padding: 16px;
+      border: 1px solid #dce8e3;
+      border-radius: 13px;
+      background: rgba(255,255,255,.9);
+      box-shadow: 0 8px 24px rgba(32, 68, 57, .06);
+      overflow: hidden;
+    }
+    .report-kpi::after {
+      content: '';
+      position: absolute;
+      right: -24px;
+      bottom: -30px;
+      width: 88px;
+      height: 88px;
+      border-radius: 999px;
+      background: var(--kpi-tint, #d9f2e8);
+    }
+    .report-kpi-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .report-kpi-value {
+      position: relative;
+      z-index: 1;
+      margin-top: 7px;
+      font-size: clamp(25px, 3vw, 36px);
+      font-weight: 850;
+      letter-spacing: -.04em;
+    }
+    .report-kpi-note {
+      position: relative;
+      z-index: 1;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .report-card {
+      border: 1px solid #dce8e3;
+      border-radius: 13px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(32, 68, 57, .05);
+      overflow: hidden;
+    }
+    .report-card.wide { grid-column: 1 / -1; }
+    .report-card-head {
+      padding: 15px 17px 12px;
+      border-bottom: 1px solid #e5ece8;
+    }
+    .report-card-head h3 {
+      margin: 0;
+      font-size: 14px;
+    }
+    .report-card-head p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .report-chart {
+      display: grid;
+      gap: 13px;
+      padding: 16px 17px 18px;
+    }
+    .report-bar-row {
+      display: grid;
+      grid-template-columns: minmax(85px, 120px) minmax(100px, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+    }
+    .report-bar-label {
+      overflow: hidden;
+      color: #34443d;
+      font-size: 12px;
+      font-weight: 750;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .report-bar-track {
+      height: 10px;
+      border-radius: 999px;
+      background: #edf2ef;
+      overflow: hidden;
+    }
+    .report-bar-fill {
+      height: 100%;
+      width: var(--bar-width);
+      min-width: 3px;
+      border-radius: inherit;
+      background: var(--bar-color, var(--accent));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset;
+    }
+    .report-bar-value {
+      min-width: 66px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .report-outcome-track {
+      display: flex;
+      height: 13px;
+      border-radius: 999px;
+      background: #edf2ef;
+      overflow: hidden;
+    }
+    .report-outcome-correct { background: #10b981; }
+    .report-outcome-wrong { background: #f97366; }
+    .report-insights {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 15px 17px 17px;
+    }
+    .report-insight {
+      padding: 12px;
+      border-radius: 10px;
+      background: #f3f8f5;
+    }
+    .report-insight span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .report-insight strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+    }
+    .report-table-wrap { overflow-x: auto; }
+    .report-table-wrap table { min-width: 760px; }
+    .report-table-wrap td { font-variant-numeric: tabular-nums; }
+    .report-score {
+      display: grid;
+      grid-template-columns: 55px minmax(75px, 1fr);
+      align-items: center;
+      gap: 8px;
+    }
+    .report-score .report-bar-track { height: 7px; }
+    .report-result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .report-result-badge.correct { color: var(--good); background: #e7f6ee; }
+    .report-result-badge.incorrect { color: var(--bad); background: #fdecec; }
+    .report-empty {
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+    }
     .agent-message.correct {
       border-color: #a7d8bd;
       border-left-color: var(--good);
@@ -1374,6 +1662,18 @@ INDEX_HTML = r"""<!doctype html>
       main { grid-template-columns: 1fr; }
       form { border-right: 0; border-bottom: 1px solid var(--line); }
       .role-grid { grid-template-columns: 1fr; }
+      .report-grid { grid-template-columns: 1fr; }
+      .report-card.wide { grid-column: auto; }
+    }
+    @media (max-width: 560px) {
+      .panel-head, .panel-actions { align-items: stretch; flex-direction: column; }
+      .panel-actions button { width: 100%; }
+      .visual-report-modal { width: 100vw; max-height: 100vh; border-radius: 0; }
+      .visual-report-shell { max-height: 100vh; }
+      .visual-report-hero { padding: 19px; }
+      .visual-report-body { padding: 14px; }
+      .report-kpis, .report-insights { grid-template-columns: 1fr; }
+      .report-bar-row { grid-template-columns: 78px minmax(80px, 1fr) auto; }
     }
   </style>
 </head>
@@ -1389,11 +1689,14 @@ INDEX_HTML = r"""<!doctype html>
           <span>Compute unit</span>
           <strong id="compute-unit-value">Not active</strong>
         </div>
-        <div class="inline">
+        <div class="agent-count-control">
           <div>
             <label for="agent-count">Number of agents</label>
             <input id="agent-count" name="agentCount" type="number" min="1" max="12" value="3">
           </div>
+          <button id="copy-agent-model" class="secondary copy-agent-model" type="button" title="Use A1's model for every agent">
+            Copy A1 to all
+          </button>
         </div>
         <div id="agent-model-list" class="agent-list"></div>
       </section>
@@ -1429,6 +1732,9 @@ INDEX_HTML = r"""<!doctype html>
             <h2>Metrics by Mechanism</h2>
             <div class="panel-actions">
               <div id="out-path" class="path"></div>
+              <button id="visual-report" class="report-button" type="button" disabled aria-haspopup="dialog">
+                <span aria-hidden="true">▥</span> Visual report
+              </button>
               <button id="download-report" class="secondary" type="button" disabled>Download report</button>
             </div>
           </div>
@@ -1453,6 +1759,20 @@ INDEX_HTML = r"""<!doctype html>
       </div>
     </div>
   </main>
+
+  <dialog id="visual-report-modal" class="visual-report-modal" aria-labelledby="visual-report-title">
+    <div class="visual-report-shell">
+      <div class="visual-report-hero">
+        <div>
+          <div class="visual-report-eyebrow">Experiment intelligence</div>
+          <h2 id="visual-report-title">Benchmark visual report</h2>
+          <p class="visual-report-subtitle">A detailed view of quality, speed, token cost, agreement, and individual outcomes.</p>
+        </div>
+        <button id="visual-report-close" class="visual-report-close" type="button" aria-label="Close visual report">×</button>
+      </div>
+      <div id="visual-report-content" class="visual-report-body"></div>
+    </div>
+  </dialog>
 
   <script>
     const $ = (id) => document.getElementById(id);
@@ -1557,10 +1877,27 @@ INDEX_HTML = r"""<!doctype html>
           </div>
         `;
       }).join('');
+      $('copy-agent-model').disabled = count <= 1;
     }
 
     function selectedAgentModels() {
       return Array.from(document.querySelectorAll('.agent-model-select')).map((node) => node.value);
+    }
+
+    function copyFirstAgentModelToAll() {
+      const selects = Array.from(document.querySelectorAll('.agent-model-select'));
+      if (selects.length < 2) return;
+      const firstModel = selects[0].value;
+      selects.slice(1).forEach((select) => {
+        select.value = firstModel;
+      });
+      const button = $('copy-agent-model');
+      button.textContent = 'Copied from A1 ✓';
+      button.classList.add('copied');
+      window.setTimeout(() => {
+        button.textContent = 'Copy A1 to all';
+        button.classList.remove('copied');
+      }, 1400);
     }
 
     function renderMechanismCards(mechanisms) {
@@ -1729,6 +2066,7 @@ INDEX_HTML = r"""<!doctype html>
       $('results').style.display = 'block';
       $('out-path').textContent = data.resultsPath || '';
       $('download-report').disabled = !(data.records && data.records.length);
+      $('visual-report').disabled = !(data.records && data.records.length);
 
       renderSummaryByMechanism(data.summary.by_benchmark_mechanism || []);
       renderRecordsByMechanism(data.records || [], data.interactions || []);
@@ -2010,6 +2348,192 @@ INDEX_HTML = r"""<!doctype html>
       URL.revokeObjectURL(url);
     }
 
+    const reportColors = {
+      voting: '#2563eb',
+      role: '#7c3aed',
+      debate: '#d97706'
+    };
+
+    function openVisualReport() {
+      if (!currentRunData || !currentRunData.records || !currentRunData.records.length) return;
+      renderVisualReport(currentRunData);
+      const modal = $('visual-report-modal');
+      document.body.classList.add('modal-open');
+      if (!modal.open) modal.showModal();
+    }
+
+    function closeVisualReport() {
+      const modal = $('visual-report-modal');
+      if (modal.open) modal.close();
+    }
+
+    function aggregateReportMechanisms(data) {
+      const rows = (data.summary && data.summary.by_benchmark_mechanism) || [];
+      const records = data.records || [];
+      return mechanismGroups(rows).map(([mechanism, items]) => {
+        const mechanismRecords = records.filter((record) => record.mechanism === mechanism);
+        return {
+          mechanism,
+          n: items.reduce((sum, item) => sum + Number(item.n || 0), 0),
+          accuracy: weightedAverage(items, 'accuracy', 'n'),
+          elapsed: weightedAverage(items, 'mean_elapsed_s', 'n'),
+          tokens: weightedAverage(items, 'mean_total_tokens', 'n'),
+          agreement: weightedAverage(items, 'mean_agreement', 'n'),
+          tieRate: weightedAverage(items, 'tie_rate', 'n'),
+          debateRounds: weightedAverage(items, 'mean_debate_rounds', 'n'),
+          correct: mechanismRecords.filter((record) => record.correct).length,
+          incorrect: mechanismRecords.filter((record) => !record.correct).length
+        };
+      });
+    }
+
+    function reportBarRows(items, valueKey, formatter, fixedMax = null) {
+      const maximum = fixedMax === null
+        ? Math.max(...items.map((item) => Number(item[valueKey] || 0)), 0)
+        : fixedMax;
+      if (!items.length) return '<div class="report-empty">No data available.</div>';
+      return items.map((item) => {
+        const value = Number(item[valueKey] || 0);
+        const width = maximum ? Math.max(1.5, Math.min(100, value / maximum * 100)) : 0;
+        const meta = mechanismMeta(item.mechanism);
+        return `
+          <div class="report-bar-row">
+            <div class="report-bar-label" title="${escapeHtml(meta.label)}">${escapeHtml(meta.label)}</div>
+            <div class="report-bar-track" aria-hidden="true">
+              <div class="report-bar-fill" style="--bar-width:${width}%;--bar-color:${reportColors[item.mechanism] || '#0f766e'}"></div>
+            </div>
+            <div class="report-bar-value">${formatter(value)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function reportChartCard(title, subtitle, content, wide = false) {
+      return `
+        <article class="report-card ${wide ? 'wide' : ''}">
+          <div class="report-card-head"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(subtitle)}</p></div>
+          <div class="report-chart">${content}</div>
+        </article>
+      `;
+    }
+
+    function renderVisualReport(data) {
+      const overall = (data.summary && data.summary.overall) || {};
+      const summaryRows = (data.summary && data.summary.by_benchmark_mechanism) || [];
+      const records = data.records || [];
+      const mechanisms = aggregateReportMechanisms(data);
+      const computeUnits = Array.isArray(data.computeUnits) ? data.computeUnits : [];
+      const computeLabel = [...new Set(computeUnits.map((unit) => unit.label).filter(Boolean))].join(' + ') || 'Not reported';
+      const bestAccuracy = mechanisms.length
+        ? mechanisms.reduce((best, item) => item.accuracy > best.accuracy ? item : best)
+        : null;
+      const fastest = mechanisms.length
+        ? mechanisms.reduce((best, item) => item.elapsed < best.elapsed ? item : best)
+        : null;
+      const leanest = mechanisms.length
+        ? mechanisms.reduce((best, item) => item.tokens < best.tokens ? item : best)
+        : null;
+      const isComplete = data.status === 'done';
+
+      const outcomeRows = mechanisms.map((item) => {
+        const total = item.correct + item.incorrect;
+        const correctWidth = total ? item.correct / total * 100 : 0;
+        const incorrectWidth = total ? item.incorrect / total * 100 : 0;
+        return `
+          <div class="report-bar-row">
+            <div class="report-bar-label">${escapeHtml(mechanismMeta(item.mechanism).label)}</div>
+            <div class="report-outcome-track" aria-label="${item.correct} correct, ${item.incorrect} incorrect">
+              <div class="report-outcome-correct" style="width:${correctWidth}%"></div>
+              <div class="report-outcome-wrong" style="width:${incorrectWidth}%"></div>
+            </div>
+            <div class="report-bar-value">${item.correct} / ${total}</div>
+          </div>
+        `;
+      }).join('');
+
+      const detailRows = summaryRows.map((row) => `
+        <tr>
+          <td><strong>${escapeHtml(mechanismMeta(row.mechanism).label)}</strong></td>
+          <td>${escapeHtml(row.benchmark)}</td>
+          <td>${formatInteger(row.n)}</td>
+          <td>
+            <div class="report-score">
+              <strong>${formatPct(row.accuracy)}</strong>
+              <div class="report-bar-track"><div class="report-bar-fill" style="--bar-width:${Math.max(1.5, Number(row.accuracy || 0) * 100)}%;--bar-color:${reportColors[row.mechanism] || '#0f766e'}"></div></div>
+            </div>
+          </td>
+          <td>${formatNumber(row.mean_elapsed_s, 4)}s</td>
+          <td>${formatNumber(row.mean_total_tokens, 1)}</td>
+          <td>${formatPct(row.mean_agreement)}</td>
+          <td>${formatPct(row.tie_rate)}</td>
+          <td>${formatNumber(row.mean_debate_rounds, 1)}</td>
+        </tr>
+      `).join('');
+
+      const resultRows = records.map((row) => `
+        <tr>
+          <td><strong>${escapeHtml(row.task_label || row.benchmark)}</strong><div class="record-meta">${escapeHtml(row.item_id)}</div></td>
+          <td>${escapeHtml(mechanismMeta(row.mechanism).label)}</td>
+          <td>${escapeHtml(row.gold_display || row.gold_answer)}</td>
+          <td>${escapeHtml(row.final_answer_display || row.final_answer)}</td>
+          <td><span class="report-result-badge ${row.correct ? 'correct' : 'incorrect'}">${row.correct ? '✓ Correct' : '✕ Incorrect'}</span></td>
+          <td>${formatPct(row.agreement)}</td>
+          <td>${formatInteger(row.total_tokens)}</td>
+          <td>${formatNumber(row.elapsed_s, 4)}s</td>
+        </tr>
+      `).join('');
+
+      $('visual-report-content').innerHTML = `
+        <div class="report-meta-strip">
+          <span>${isComplete ? 'Complete experiment' : 'Live partial report'}</span>
+          <span>Compute: ${escapeHtml(computeLabel)}</span>
+          <span>Generated: ${escapeHtml(new Date().toLocaleString())}</span>
+          ${data.resultsPath ? `<span title="${escapeHtml(data.resultsPath)}">Saved results available</span>` : ''}
+        </div>
+
+        <section class="report-kpis" aria-label="Experiment headline metrics">
+          <div class="report-kpi" style="--kpi-tint:#dbeafe"><div class="report-kpi-label">Unique questions</div><div class="report-kpi-value">${formatInteger(overall.question_count)}</div><div class="report-kpi-note">Across selected benchmarks</div></div>
+          <div class="report-kpi" style="--kpi-tint:#ede9fe"><div class="report-kpi-label">Evaluations</div><div class="report-kpi-value">${formatInteger(overall.n || records.length)}</div><div class="report-kpi-note">Question × mechanism runs</div></div>
+          <div class="report-kpi" style="--kpi-tint:#d1fae5"><div class="report-kpi-label">Overall accuracy</div><div class="report-kpi-value">${formatPct(overall.accuracy)}</div><div class="report-kpi-note">Correct coordinator answers</div></div>
+          <div class="report-kpi" style="--kpi-tint:#fef3c7"><div class="report-kpi-label">Mean response time</div><div class="report-kpi-value">${formatNumber(overall.mean_elapsed_s, 3)}s</div><div class="report-kpi-note">Per evaluation</div></div>
+          <div class="report-kpi" style="--kpi-tint:#cffafe"><div class="report-kpi-label">Mean tokens</div><div class="report-kpi-value">${formatNumber(overall.mean_total_tokens, 0)}</div><div class="report-kpi-note">Prompt + completion</div></div>
+        </section>
+
+        <section class="report-grid" aria-label="Experiment charts">
+          ${reportChartCard('Accuracy by mechanism', 'Higher is better; scale is fixed from 0 to 100%.', reportBarRows(mechanisms, 'accuracy', formatPct, 1))}
+          ${reportChartCard('Agreement by mechanism', 'How consistently agents converged on the same answer.', reportBarRows(mechanisms, 'agreement', formatPct, 1))}
+          ${reportChartCard('Mean response time', 'Average wall-clock duration per evaluated item.', reportBarRows(mechanisms, 'elapsed', (value) => `${formatNumber(value, 3)}s`))}
+          ${reportChartCard('Mean token use', 'Average prompt and completion tokens per evaluated item.', reportBarRows(mechanisms, 'tokens', (value) => formatNumber(value, 0)))}
+          ${reportChartCard('Correct vs. incorrect outcomes', 'Green shows correct answers; coral shows errors. The value is correct / total.', outcomeRows || '<div class="report-empty">No outcomes available.</div>', true)}
+
+          <article class="report-card wide">
+            <div class="report-card-head"><h3>At-a-glance leaders</h3><p>Best observed values within this experiment; no cross-run assumptions.</p></div>
+            <div class="report-insights">
+              <div class="report-insight"><span>Highest accuracy</span><strong>${bestAccuracy ? `${escapeHtml(mechanismMeta(bestAccuracy.mechanism).label)} · ${formatPct(bestAccuracy.accuracy)}` : 'No data'}</strong></div>
+              <div class="report-insight"><span>Fastest mean time</span><strong>${fastest ? `${escapeHtml(mechanismMeta(fastest.mechanism).label)} · ${formatNumber(fastest.elapsed, 3)}s` : 'No data'}</strong></div>
+              <div class="report-insight"><span>Lowest token use</span><strong>${leanest ? `${escapeHtml(mechanismMeta(leanest.mechanism).label)} · ${formatNumber(leanest.tokens, 0)}` : 'No data'}</strong></div>
+            </div>
+          </article>
+
+          <article class="report-card wide">
+            <div class="report-card-head"><h3>Benchmark × mechanism detail</h3><p>Full aggregate metrics, including ties and debate rounds.</p></div>
+            <div class="report-table-wrap"><table>
+              <thead><tr><th>Mechanism</th><th>Benchmark</th><th>N</th><th>Accuracy</th><th>Mean time</th><th>Mean tokens</th><th>Agreement</th><th>Tie rate</th><th>Rounds</th></tr></thead>
+              <tbody>${detailRows || '<tr><td colspan="9">No aggregate data available.</td></tr>'}</tbody>
+            </table></div>
+          </article>
+
+          <article class="report-card wide">
+            <div class="report-card-head"><h3>Individual experiment outcomes</h3><p>Ground truth, coordinator answer, quality, cost, and timing for every evaluation.</p></div>
+            <div class="report-table-wrap"><table>
+              <thead><tr><th>Task</th><th>Mechanism</th><th>Ground truth</th><th>Coordinator</th><th>Result</th><th>Agreement</th><th>Tokens</th><th>Time</th></tr></thead>
+              <tbody>${resultRows || '<tr><td colspan="8">No results available.</td></tr>'}</tbody>
+            </table></div>
+          </article>
+        </section>
+      `;
+    }
+
     function buildMarkdownReport(data) {
       const lines = [];
       lines.push('# Agentic Systems Experiment Report', '');
@@ -2099,6 +2623,13 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     $('download-report').addEventListener('click', downloadReport);
+    $('visual-report').addEventListener('click', openVisualReport);
+    $('copy-agent-model').addEventListener('click', copyFirstAgentModelToAll);
+    $('visual-report-close').addEventListener('click', closeVisualReport);
+    $('visual-report-modal').addEventListener('close', () => document.body.classList.remove('modal-open'));
+    $('visual-report-modal').addEventListener('click', (event) => {
+      if (event.target === $('visual-report-modal')) closeVisualReport();
+    });
 
     $('experiment-form').addEventListener('submit', async (event) => {
       event.preventDefault();
