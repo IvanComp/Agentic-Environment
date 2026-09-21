@@ -50,7 +50,8 @@ class HeuristicProvider:
 
     name = "heuristic"
 
-    def __init__(self) -> None:
+    def __init__(self, *, seed: int = 0) -> None:
+        self.seed = seed
         architecture = platform.machine() or "unknown architecture"
         self.compute_unit = {
             "kind": "cpu",
@@ -131,10 +132,12 @@ class GgufModelProvider:
         *,
         model_key: str,
         n_ctx: int = 2048,
+        seed: int = 0,
     ) -> None:
         self.preset = get_model_preset(model_key)
         self.model_key = model_key
         self.n_ctx = n_ctx
+        self.seed = seed
         # llama.cpp contexts are stateful. A provider can be shared by several
         # agents to avoid loading the same multi-GB model more than once, so
         # serialize calls that target that shared context.
@@ -197,6 +200,7 @@ class GgufModelProvider:
             model_path=str(model_path(self.model_key)),
             n_ctx=self.n_ctx,
             n_gpu_layers=-1,
+            seed=self.seed,
             verbose=False,
         )
         self.compute_unit = _loaded_compute_unit(llama_cpp, llm)
@@ -204,7 +208,7 @@ class GgufModelProvider:
 
     def _complete(self, prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
         system = (
-            "You are a careful quantitative reasoning agent. "
+            "You are a careful reasoning agent. Follow the scenario and evaluation instructions exactly. "
             "Return only valid JSON with keys answer, confidence, rationale."
         )
         if hasattr(self.llm, "create_chat_completion"):
@@ -223,12 +227,14 @@ def make_model_provider(
     *,
     model_key: str = "demo",
     n_ctx: int = 2048,
+    seed: int = 0,
 ) -> LLMProvider:
     if model_key == "demo":
-        return HeuristicProvider()
+        return HeuristicProvider(seed=seed)
     return GgufModelProvider(
         model_key=model_key,
         n_ctx=n_ctx,
+        seed=seed,
     )
 
 
@@ -238,12 +244,13 @@ def make_provider(
     model: str | None = None,
     gguf: str | None = None,
     allow_download: bool | None = None,
+    seed: int = 0,
 ) -> LLMProvider:
     """Backward-compatible adapter for older scripts."""
     if provider == "heuristic":
-        return make_model_provider(model_key="demo")
+        return make_model_provider(model_key="demo", seed=seed)
     if provider == "llama-cpp-local":
-        return make_model_provider(model_key=model or "qwen2.5-0.5b")
+        return make_model_provider(model_key=model or "qwen2.5-0.5b", seed=seed)
     if provider == "transformers-local":
         raise ValueError(
             "transformers-local is no longer the recommended path. "

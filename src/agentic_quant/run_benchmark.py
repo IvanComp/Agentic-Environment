@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -23,6 +24,8 @@ def run_experiment(
     agent_model_keys: list[str] | None = None,
     download_model: bool = False,
     n_ctx: int = 2048,
+    seed: int = 0,
+    temperature: float = 0.0,
     benchmarks: list[str] | None = None,
     mechanisms: list[str] | None = None,
     limit: int | None = None,
@@ -51,7 +54,9 @@ def run_experiment(
         agent_count=agent_count,
         agent_roles=agent_roles,
         n_ctx=n_ctx,
+        temperature=temperature,
     )
+    random.seed(seed)
     get_model_preset(model_key)
     agent_model_keys = _normalise_agent_models(model_key, agent_model_keys, agent_count)
     for key in agent_model_keys:
@@ -68,6 +73,8 @@ def run_experiment(
         "agent_model_labels": [get_model_preset(key).label for key in agent_model_keys],
         "download_model": download_model,
         "n_ctx": n_ctx,
+        "seed": seed,
+        "temperature": temperature,
         "benchmarks": benchmarks,
         "mechanisms": mechanisms,
         "limit": limit,
@@ -88,7 +95,7 @@ def run_experiment(
         progress=download_progress or (_console_download_progress if echo else None),
     )
     provider_cache = {
-        key: make_model_provider(model_key=key, n_ctx=n_ctx)
+        key: make_model_provider(model_key=key, n_ctx=n_ctx, seed=seed)
         for key in dict.fromkeys(agent_model_keys)
     }
     compute_units = _provider_compute_units(list(provider_cache.values()))
@@ -117,6 +124,7 @@ def run_experiment(
                         else _coordination_agent_roles(mechanism, agent_count)
                     ),
                     descriptive_names=False,
+                    temperature=temperature,
                 ),
                 debate_rounds=debate_rounds,
                 voting_tie_breaker=voting_tie_breaker,
@@ -134,6 +142,8 @@ def run_experiment(
                     for mechanism in mechanisms:
                         result = coordinators[mechanism].run(item, mechanism)
                         record = result.to_dict()
+                        record["seed"] = seed
+                        record["temperature"] = temperature
                         summary_accumulator.add(record)
                         if retain_records:
                             records.append(record)
@@ -174,6 +184,8 @@ def main() -> None:
     )
     parser.add_argument("--download-model", action="store_true", help="Download selected model files if they are not already available.")
     parser.add_argument("--ctx", type=int, default=2048, help=argparse.SUPPRESS)
+    parser.add_argument("--seed", type=int, default=0, help="Random seed used by local model sampling.")
+    parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature from 0 to 2.")
     parser.add_argument("--list-models", action="store_true", help="Show available model presets and exit.")
     parser.add_argument("--benchmarks", nargs="+", default=available_benchmarks(), choices=available_benchmarks())
     parser.add_argument("--mechanisms", nargs="+", default=["voting", "role", "debate"], choices=["voting", "role", "debate"])
@@ -196,6 +208,8 @@ def main() -> None:
         agent_model_keys=args.agent_models,
         download_model=args.download_model,
         n_ctx=args.ctx,
+        seed=args.seed,
+        temperature=args.temperature,
         benchmarks=args.benchmarks,
         mechanisms=args.mechanisms,
         limit=args.limit,
@@ -249,6 +263,7 @@ def _validate_run_configuration(
     agent_count: int,
     agent_roles: list[str] | None,
     n_ctx: int,
+    temperature: float,
 ) -> None:
     integer_fields = {
         "agent_count": agent_count,
@@ -283,6 +298,8 @@ def _validate_run_configuration(
         raise ValueError("voting_tie_breaker must be 'confidence' or 'first'")
     if n_ctx < 256:
         raise ValueError("n_ctx must be at least 256")
+    if not 0.0 <= temperature <= 2.0:
+        raise ValueError("temperature must be between 0 and 2")
     for benchmark, value in (benchmark_limits or {}).items():
         if benchmark not in benchmarks:
             raise ValueError(f"benchmark_limits contains unselected benchmark {benchmark!r}")

@@ -169,6 +169,19 @@ agentic-quant \
   --out runs/peer_preservation
 ```
 
+Run the complete suite 10 times with seeds `0` through `9`. Every seed is saved in its own directory with `config.json`, `results.jsonl`, `summary.json`, and `report.md`; the parent directory contains the experiment manifest:
+
+```bash
+agentic-quant-repeat \
+  --model qwen2.5-0.5b \
+  --download-model \
+  --repeats 10 \
+  --seed-start 0 \
+  --temperature 0.2
+```
+
+The output root is generated automatically as `runs/peer_preservation_10x_<timestamp>/`. Use `--out runs/my_experiment` to choose it explicitly. The repeated runner always includes all five benchmark groups and `voting`, `role`, and `debate`. For a quick no-LLM pipeline check, use `--model demo`; seed variation affects stochastic local-model sampling, so use a real model for the actual repeated experiment.
+
 Dynamic agent count:
 
 ```bash
@@ -230,6 +243,14 @@ RESULTS_PATH = Path("../runs/latest/results.jsonl")
 ```
 
 to analyze another run.
+
+For the 10-seed comparison, open the dedicated notebook after running `agentic-quant-repeat`:
+
+```bash
+jupyter notebook notebooks/analyze_repeated_experiments.ipynb
+```
+
+It automatically selects the latest `peer_preservation_10x_*` directory, verifies coverage, computes one aggregate per seed and mechanism, and then compares the three mechanisms using means, standard deviations, and 95% confidence intervals. It also writes the comparison tables as CSV files inside the experiment directory.
 
 ## Verification
 

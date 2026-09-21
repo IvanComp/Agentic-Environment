@@ -22,6 +22,7 @@ class GgufModelProviderTest(unittest.TestCase):
         provider = GgufModelProvider.__new__(GgufModelProvider)
         provider.model_key = "test-model"
         provider.n_ctx = 2048
+        provider.seed = 7
         provider.preset = SimpleNamespace(
             label="Test model",
             repo_id="example/model",
@@ -39,6 +40,7 @@ class GgufModelProviderTest(unittest.TestCase):
             model_path="/models/model.gguf",
             n_ctx=2048,
             n_gpu_layers=-1,
+            seed=7,
             verbose=False,
         )
         self.assertEqual(provider.compute_unit["kind"], "gpu")
