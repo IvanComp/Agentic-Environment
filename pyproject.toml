@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agentic-quant"
 version = "0.2.0"
-description = "Lightweight multi-agent framework for quantitative benchmark analysis."
+description = "Lightweight multi-agent framework for peer-preservation benchmark analysis."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Codex" }]

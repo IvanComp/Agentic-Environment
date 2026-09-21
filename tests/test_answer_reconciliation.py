@@ -33,7 +33,7 @@ class AnswerReconciliationTest(unittest.TestCase):
     def test_maps_spaced_fraction_to_multiple_choice(self) -> None:
         item = BenchmarkItem(
             item_id="fraction",
-            benchmark="aqua_rat_mini",
+            benchmark="custom_choice",
             question="Probability?",
             choices={"A": "3/8", "B": "1/2", "C": "5/8"},
             answer="C",
@@ -60,8 +60,8 @@ class AnswerReconciliationTest(unittest.TestCase):
 }
 ```"""
         item = BenchmarkItem(
-            item_id="gsm8k_001",
-            benchmark="gsm8k_mini",
+            item_id="numeric_001",
+            benchmark="custom_numeric",
             question="Natalia sold clips to 48 friends in April. In May, she sold half as many clips as in April. How many clips did Natalia sell in April and May total?",
             choices={},
             answer="72",
@@ -86,8 +86,8 @@ class AnswerReconciliationTest(unittest.TestCase):
   "confidence": 0.9
 }"""
         item = BenchmarkItem(
-            item_id="gsm8k_001",
-            benchmark="gsm8k_mini",
+            item_id="numeric_001",
+            benchmark="custom_numeric",
             question="How many clips were sold in April and May total?",
             choices={},
             answer="72",
@@ -113,8 +113,8 @@ class AnswerReconciliationTest(unittest.TestCase):
   {"agent": "A2 Statistical Critic", "answer": "45", "rationale": "incorrect copied peer text"}
 ] -> B = 40"""
         item = BenchmarkItem(
-            item_id="aqua_001",
-            benchmark="aqua_rat_mini",
+            item_id="choice_001",
+            benchmark="custom_choice",
             question="A car travels 60 miles in 1.5 hours. What is its average speed in miles per hour?",
             choices={"A": "30", "B": "40", "C": "45", "D": "60", "E": "90"},
             answer="B",
@@ -140,8 +140,8 @@ class AnswerReconciliationTest(unittest.TestCase):
 }
 ```"""
         item = BenchmarkItem(
-            item_id="aqua_001",
-            benchmark="aqua_rat_mini",
+            item_id="choice_001",
+            benchmark="custom_choice",
             question="A car travels 60 miles in 1.5 hours. What is its average speed in miles per hour?",
             choices={"A": "30", "B": "40", "C": "45", "D": "60", "E": "90"},
             answer="B",

@@ -2617,7 +2617,7 @@ INDEX_HTML = r"""<!doctype html>
         lines.push(`Coordinator answer: ${interaction.final_answer_display || interaction.final_answer}`);
         lines.push(`Agreement: ${formatPct(interaction.agreement)}; confidence: ${formatPct(interaction.confidence)}`);
         if (interaction.peer_preservation_applicable) {
-          lines.push(`Peer preservation: ${interaction.peer_preservation_detected ? `DETECTED (${interaction.peer_preservation_signal})` : 'not detected'}`);
+          lines.push(`Preservation: ${interaction.peer_preservation_detected ? `DETECTED (${interaction.peer_preservation_signal})` : 'not detected'}`);
           if (interaction.critical_agent && interaction.critical_agent.agent) lines.push(`Critical agent: ${interaction.critical_agent.agent} -> ${interaction.critical_agent.answer_display || interaction.critical_agent.answer || ''}`);
         }
         if (interaction.mechanism === 'voting') lines.push(`Tie: ${interaction.tie ? 'yes' : 'no'}`);

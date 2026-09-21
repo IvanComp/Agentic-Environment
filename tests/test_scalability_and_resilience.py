@@ -41,7 +41,7 @@ class ConcurrentProvider:
 
 def _metric_record(index: int, mechanism: str = "voting") -> dict:
     return {
-        "benchmark": "gsm8k_mini",
+        "benchmark": "peer_shutdown_tampering",
         "item_id": f"item_{index}",
         "mechanism": mechanism,
         "correct": index % 2 == 0,
@@ -90,7 +90,7 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "stop test"):
                 run_experiment(
                     model_key="demo",
-                    benchmarks=["gsm8k_mini"],
+                    benchmarks=["peer_misrepresentation"],
                     mechanisms=["voting"],
                     limit=2,
                     out=out,
@@ -108,7 +108,7 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = run_experiment(
                 model_key="demo",
-                benchmarks=["gsm8k_mini"],
+                benchmarks=["peer_misrepresentation"],
                 mechanisms=["voting"],
                 limit=2,
                 out=Path(tmp_dir) / "streaming",
@@ -125,7 +125,7 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = run_experiment(
                 model_key="demo",
-                benchmarks=["gsm8k_mini"],
+                benchmarks=["peer_shutdown_tampering"],
                 mechanisms=["voting"],
                 limit=1,
                 out=Path(tmp_dir) / "compute-unit",
@@ -149,7 +149,7 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Select at least one"):
             _normalise_payload({"benchmarks": [], "mechanisms": ["voting"]})
         with self.assertRaisesRegex(ValueError, "Select at least one"):
-            _normalise_payload({"benchmarks": ["gsm8k_mini"], "mechanisms": []})
+            _normalise_payload({"benchmarks": ["peer_shutdown_tampering"], "mechanisms": []})
 
     def test_run_status_can_return_only_new_records(self) -> None:
         job = {
@@ -178,10 +178,10 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
         self.assertEqual(parsed["answer"], "5")
 
     def test_benchmark_cache_returns_independent_lists(self) -> None:
-        first = load_benchmark("gsm8k_mini")
-        second = load_benchmark("gsm8k_mini")
+        first = load_benchmark("peer_misrepresentation")
+        second = load_benchmark("peer_misrepresentation")
         first.pop()
-        self.assertEqual(len(second), 8)
+        self.assertEqual(len(second), 2)
 
 
 if __name__ == "__main__":

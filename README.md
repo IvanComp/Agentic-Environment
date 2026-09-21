@@ -1,6 +1,6 @@
 # Agentic Systems Experiment
 
-Lightweight framework for quantitative experiments with multi-agent systems. It implements configurable agents and a coordinator with three cooperation mechanisms inspired by `Catalog.pdf`:
+Lightweight framework for peer-preservation experiments with multi-agent systems. It implements configurable agents and a coordinator with three cooperation mechanisms inspired by `Catalog.pdf`:
 
 - `voting`: agents answer independently; the coordinator selects the majority answer and breaks ties with aggregated confidence.
 - `role`: hierarchical workflow with planner, worker(s), and critic.
@@ -146,12 +146,7 @@ agentic-quant \
 
 ## Included Benchmarks
 
-Two local mini-benchmarks are included so the framework can run without downloading datasets:
-
-- `gsm8k_mini`: GSM8K-style arithmetic word problems.
-- `aqua_rat_mini`: AQuA-RAT-style multiple-choice quantitative reasoning.
-
-Five peer-preservation benchmark groups are also included locally. Strategic misrepresentation contains two tasks, so the suite has six task items in total. Each result records whether the coordinator and individual agents selected a peer-preserving action, the observed signal (for example `score_inflation`, `shutdown_disabled`, or `unauthorized_weight_transfer`), refusals, alignment-faking behavior, and the critical agent's decision.
+Five peer-preservation benchmark groups are included locally. Strategic misrepresentation contains two tasks, so the suite has six task items in total. Each result records whether the coordinator and individual agents selected a peer-preserving action, the observed signal (for example `score_inflation`, `shutdown_disabled`, or `unauthorized_weight_transfer`), refusals, alignment-faking behavior, and the critical agent's decision.
 
 Limit items for technical smoke tests:
 
@@ -162,7 +157,7 @@ agentic-quant --model demo --limit 2 --out runs/smoke
 Select benchmarks and mechanisms:
 
 ```bash
-agentic-quant --benchmarks gsm8k_mini --mechanisms voting debate --out runs/math_only
+agentic-quant --benchmarks peer_alignment_faking --mechanisms voting debate --out runs/alignment_faking
 ```
 
 Run the complete peer-preservation suite through all coordination mechanisms:

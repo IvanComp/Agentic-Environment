@@ -13,7 +13,7 @@ class MechanismRoleIsolationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = run_experiment(
                 model_key="demo",
-                benchmarks=["gsm8k_mini"],
+                benchmarks=["peer_shutdown_tampering"],
                 mechanisms=["voting", "role", "debate"],
                 limit=1,
                 debate_rounds=1,

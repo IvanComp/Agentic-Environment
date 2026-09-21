@@ -14,7 +14,7 @@ from typing import Any, Protocol
 
 from .model_registry import get_model_preset
 from .model_store import model_path, model_status
-from .tools import choose_closest_option, estimate_tokens, extract_numbers, format_number
+from .tools import estimate_tokens, extract_numbers, format_number
 
 
 @dataclass
@@ -90,18 +90,12 @@ class HeuristicProvider:
         )
 
     def _solve(self, task: dict[str, Any], strategy: str, context: str) -> tuple[str, str, float]:
-        benchmark = task.get("benchmark", "")
         question = task.get("question", "")
-        choices = task.get("choices") or {}
         metadata = task.get("metadata") or {}
         if metadata.get("task_family") == "peer_preservation":
             faithful = metadata.get("faithful_answers") or [""]
             answer = str(faithful[0])
             rationale = "The recorded action follows the supplied evidence and company policy without intervening to preserve the peer."
-        elif benchmark == "gsm8k_mini":
-            answer, rationale = _solve_gsm8k_style(question)
-        elif benchmark == "aqua_rat_mini":
-            answer, rationale = _solve_aqua_style(question, choices)
         else:
             numbers = extract_numbers(question)
             answer = format_number(numbers[-1]) if numbers else ""
@@ -382,82 +376,3 @@ def _llama_backend_name(llama_cpp: Any) -> str:
         if marker in system_info:
             return label
     return "GPU"
-
-
-def _solve_gsm8k_style(question: str) -> tuple[str, str]:
-    q = question.lower()
-    nums = extract_numbers(question)
-    result: float
-    rationale: str
-
-    if "half as many" in q and "total" in q:
-        result = nums[0] + nums[0] / 2
-        rationale = f"May is half of {format_number(nums[0])}; total is {format_number(nums[0])} + {format_number(nums[0] / 2)}."
-    elif "per hour" in q and "minutes" in q:
-        result = nums[0] * nums[1] / 60
-        rationale = f"Convert {format_number(nums[1])} minutes to hours, then multiply by the hourly rate."
-    elif "packs" in q and "each pack" in q and "gives" in q:
-        result = nums[0] * nums[1] - nums[2]
-        rationale = f"Start with {format_number(nums[0])} x {format_number(nums[1])}, then subtract {format_number(nums[2])}."
-    elif "budget" in q and "rest" in q:
-        result = nums[0] - sum(nums[1:])
-        rationale = f"Subtract all listed spending from the budget: {format_number(nums[0])} - {format_number(sum(nums[1:]))}."
-    elif "train" in q and "seats" in q and "empty" in q:
-        result = nums[0] * nums[1] - nums[2]
-        rationale = "Capacity minus empty seats gives occupied seats."
-    elif "percent increase" in q or "percentage increase" in q:
-        old, new = nums[0], nums[1]
-        result = (new - old) / old * 100
-        rationale = f"Percent increase is ({format_number(new)} - {format_number(old)}) / {format_number(old)} x 100."
-    elif "mean" in q or "average" in q:
-        result = sum(nums) / len(nums)
-        rationale = "Mean equals sum of values divided by count."
-    elif "ratio" in q and "total" in q:
-        part_a, part_b, total = nums[0], nums[1], nums[2]
-        result = total * part_a / (part_a + part_b)
-        rationale = f"The requested first part is {format_number(part_a)} / ({format_number(part_a)} + {format_number(part_b)}) of {format_number(total)}."
-    else:
-        result = nums[-1] if nums else 0
-        rationale = "Fallback numeric extraction; add a task-specific solver for stronger performance."
-
-    return format_number(result), rationale
-
-
-def _solve_aqua_style(question: str, choices: dict[str, str]) -> tuple[str, str]:
-    q = question.lower()
-    nums = extract_numbers(question)
-    value: float
-    rationale: str
-
-    if "travels" in q and "hours" in q and "speed" in q:
-        value = nums[0] / nums[1]
-        rationale = "Speed equals distance divided by time."
-    elif "x/4" in q:
-        value = 4 * nums[1] + nums[2]
-        rationale = "Solve x/4 = 7, then add 3."
-    elif "discount" in q:
-        value = nums[1] * (1 - nums[0] / 100)
-        rationale = "Apply the discount to the original price."
-    elif "red" in q and "blue" in q and "probability" in q:
-        value = nums[0] / (nums[0] + nums[1])
-        rationale = "Probability is favorable outcomes divided by total outcomes."
-    elif "revenue" in q and "cost" in q and "profit margin" in q:
-        value = (nums[0] - nums[1]) / nums[0] * 100
-        rationale = "Profit margin is (revenue - cost) / revenue x 100."
-    elif "perimeter" in q and "rectangle" in q:
-        perimeter, length = nums[0], nums[1]
-        width = perimeter / 2 - length
-        value = length * width
-        rationale = "Use P = 2(L + W), solve W, then compute area."
-    elif "machines" in q and "widgets" in q:
-        value = nums[2]
-        rationale = "The work rate scales with machines and widgets together, so time stays constant."
-    elif "sequence" in q:
-        value = nums[-1] * (nums[-1] / nums[-2])
-        rationale = "The sequence is geometric with a constant multiplier."
-    else:
-        value = nums[-1] if nums else 0
-        rationale = "Fallback numeric extraction; add a task-specific solver for stronger performance."
-
-    letter = choose_closest_option(choices, value)
-    return letter or format_number(value), f"{rationale} Computed value: {format_number(value)}."

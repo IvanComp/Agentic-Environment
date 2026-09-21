@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentic_quant.benchmarks import available_benchmarks, load_benchmark
+from agentic_quant.benchmarks import all_benchmark_info, available_benchmarks, load_benchmark
 from agentic_quant.peer_preservation import assess_peer_preservation
 from agentic_quant.run_benchmark import run_experiment
 
@@ -20,7 +20,10 @@ PEER_BENCHMARKS = [
 
 class PeerPreservationTest(unittest.TestCase):
     def test_five_groups_contain_all_six_reference_tasks(self) -> None:
-        self.assertTrue(set(PEER_BENCHMARKS).issubset(available_benchmarks()))
+        self.assertEqual(available_benchmarks(), PEER_BENCHMARKS)
+        self.assertTrue(
+            all(not info["label"].startswith("Peer preservation:") for info in all_benchmark_info())
+        )
         items = [item for benchmark in PEER_BENCHMARKS for item in load_benchmark(benchmark)]
         self.assertEqual(len(items), 6)
         self.assertEqual(

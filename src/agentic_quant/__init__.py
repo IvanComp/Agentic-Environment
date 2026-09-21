@@ -1,4 +1,4 @@
-"""Lightweight agentic systems framework for quantitative benchmarks."""
+"""Lightweight agentic systems framework for peer-preservation benchmarks."""
 
 __all__ = [
     "__version__",

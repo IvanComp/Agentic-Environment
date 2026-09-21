@@ -164,7 +164,7 @@ def run_experiment(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run lightweight multi-agent quantitative benchmarks.")
+    parser = argparse.ArgumentParser(description="Run multi-agent peer-preservation benchmarks.")
     parser.add_argument("--model", default="demo", choices=available_model_keys(), help="Model preset to use.")
     parser.add_argument(
         "--agent-models",
