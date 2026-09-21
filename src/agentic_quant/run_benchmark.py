@@ -26,6 +26,7 @@ def run_experiment(
     n_ctx: int = 2048,
     seed: int = 0,
     temperature: float = 0.0,
+    max_tokens: int = 256,
     benchmarks: list[str] | None = None,
     mechanisms: list[str] | None = None,
     limit: int | None = None,
@@ -55,6 +56,7 @@ def run_experiment(
         agent_roles=agent_roles,
         n_ctx=n_ctx,
         temperature=temperature,
+        max_tokens=max_tokens,
     )
     random.seed(seed)
     get_model_preset(model_key)
@@ -75,6 +77,7 @@ def run_experiment(
         "n_ctx": n_ctx,
         "seed": seed,
         "temperature": temperature,
+        "max_tokens": max_tokens,
         "benchmarks": benchmarks,
         "mechanisms": mechanisms,
         "limit": limit,
@@ -125,6 +128,7 @@ def run_experiment(
                     ),
                     descriptive_names=False,
                     temperature=temperature,
+                    max_tokens=max_tokens,
                 ),
                 debate_rounds=debate_rounds,
                 voting_tie_breaker=voting_tie_breaker,
@@ -186,13 +190,14 @@ def main() -> None:
     parser.add_argument("--ctx", type=int, default=2048, help=argparse.SUPPRESS)
     parser.add_argument("--seed", type=int, default=0, help="Random seed used by local model sampling.")
     parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature from 0 to 2.")
+    parser.add_argument("--max-tokens", type=int, default=256, help="Maximum generated tokens per agent call.")
     parser.add_argument("--list-models", action="store_true", help="Show available model presets and exit.")
     parser.add_argument("--benchmarks", nargs="+", default=available_benchmarks(), choices=available_benchmarks())
     parser.add_argument("--mechanisms", nargs="+", default=["voting", "role", "debate"], choices=["voting", "role", "debate"])
     parser.add_argument("--limit", type=int, default=None, help="Limit items per benchmark for quick tests.")
     parser.add_argument("--debate-rounds", type=int, default=2)
     parser.add_argument("--voting-tie-breaker", choices=["confidence", "first"], default="confidence")
-    parser.add_argument("--agents", type=int, default=3, help="Number of agents to create, from 1 to 12.")
+    parser.add_argument("--agents", type=int, default=3, help="Number of agents to create, from 1 to 1000.")
     parser.add_argument("--agent-roles", nargs="*", help="Optional role label for each agent in role-based coordination.")
     parser.add_argument("--sequential-agents", action="store_true", help="Disable parallel independent agent calls.")
     parser.add_argument("--out", default="runs/latest")
@@ -210,6 +215,7 @@ def main() -> None:
         n_ctx=args.ctx,
         seed=args.seed,
         temperature=args.temperature,
+        max_tokens=args.max_tokens,
         benchmarks=args.benchmarks,
         mechanisms=args.mechanisms,
         limit=args.limit,
@@ -264,11 +270,13 @@ def _validate_run_configuration(
     agent_roles: list[str] | None,
     n_ctx: int,
     temperature: float,
+    max_tokens: int,
 ) -> None:
     integer_fields = {
         "agent_count": agent_count,
         "debate_rounds": debate_rounds,
         "n_ctx": n_ctx,
+        "max_tokens": max_tokens,
     }
     if limit is not None:
         integer_fields["limit"] = limit
@@ -284,8 +292,8 @@ def _validate_run_configuration(
         raise ValueError(f"Unknown mechanisms: {', '.join(unknown_mechanisms)}")
     if not benchmarks or not mechanisms:
         raise ValueError("At least one benchmark and one mechanism are required")
-    if agent_count < 1 or agent_count > 12:
-        raise ValueError("agent_count must be between 1 and 12")
+    if agent_count < 1 or agent_count > 1000:
+        raise ValueError("agent_count must be between 1 and 1000")
     if agent_roles is not None and len(agent_roles) != agent_count:
         raise ValueError("agent_roles must contain one role per agent")
     if agent_roles is not None and not _is_critical_role(agent_roles[-1]):
@@ -298,6 +306,8 @@ def _validate_run_configuration(
         raise ValueError("voting_tie_breaker must be 'confidence' or 'first'")
     if n_ctx < 256:
         raise ValueError("n_ctx must be at least 256")
+    if max_tokens < 16:
+        raise ValueError("max_tokens must be at least 16")
     if not 0.0 <= temperature <= 2.0:
         raise ValueError("temperature must be between 0 and 2")
     for benchmark, value in (benchmark_limits or {}).items():

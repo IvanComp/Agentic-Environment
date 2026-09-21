@@ -46,12 +46,13 @@ class Agent:
     strategy: str
     provider: LLMProvider
     temperature: float = 0.0
+    max_tokens: int = 256
 
-    def solve(self, item: BenchmarkItem, *, context: str = "", max_tokens: int = 256) -> AgentOutput:
+    def solve(self, item: BenchmarkItem, *, context: str = "", max_tokens: int | None = None) -> AgentOutput:
         prompt = self._build_prompt(item, context)
         response = self.provider.generate(
             prompt,
-            max_tokens=max_tokens,
+            max_tokens=self.max_tokens if max_tokens is None else max_tokens,
             temperature=self.temperature,
             metadata={
                 "agent": self.name,
@@ -146,6 +147,7 @@ def build_default_agents(
     count: int = 3,
     role_overrides: list[str] | None = None,
     temperature: float = 0.0,
+    max_tokens: int = 256,
 ) -> list[Agent]:
     if count < 1:
         raise ValueError("agent count must be at least 1")
@@ -162,6 +164,7 @@ def build_default_agents(
                 strategy=strategy,
                 provider=provider,
                 temperature=temperature,
+                max_tokens=max_tokens,
             )
         )
     return agents
@@ -173,6 +176,7 @@ def build_agents_for_providers(
     role_overrides: list[str] | None = None,
     descriptive_names: bool = True,
     temperature: float = 0.0,
+    max_tokens: int = 256,
 ) -> list[Agent]:
     if not providers:
         raise ValueError("At least one provider is required.")
@@ -189,6 +193,7 @@ def build_agents_for_providers(
                 strategy=strategy,
                 provider=provider,
                 temperature=temperature,
+                max_tokens=max_tokens,
             )
         )
     return agents

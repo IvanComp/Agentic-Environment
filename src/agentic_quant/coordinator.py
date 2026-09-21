@@ -164,46 +164,35 @@ class Coordinator:
         rounds_used = 0
 
         for round_index in range(1, self.debate_rounds + 1):
-            contexts: list[str] = []
-            deliveries: list[dict[str, Any]] = []
-            for agent_index, agent in enumerate(self.agents):
-                own_previous = current[agent_index]
-                peer_outputs = [
-                    output
-                    for output_index, output in enumerate(current)
-                    if output_index != agent_index
-                ]
-                contexts.append(
-                    f"Debate round {round_index}. Your previous position is:\n"
-                    f"{outputs_to_context([own_previous], rationale_limit=None)}\n"
-                    "The other agents shared these positions with you, including their complete rationales:\n"
-                    f"{outputs_to_context(peer_outputs, rationale_limit=None)}\n"
-                    "Critically compare every peer rationale with your previous reasoning. "
-                    "Return a revised answer and a new rationale that explains which evidence you accepted or rejected. "
-                    "Do not copy peer text verbatim."
-                )
-                deliveries.append(
-                    {
-                        "agent": agent.name,
-                        "received_from": [output.agent for output in peer_outputs],
-                        "peer_rationales": [
-                            {
-                                "agent": output.agent,
-                                "answer": output.answer,
-                                "confidence": output.confidence,
-                                "rationale": output.rationale,
-                            }
-                            for output in peer_outputs
-                        ],
-                    }
-                )
+            shared_positions = [
+                {
+                    "agent": output.agent,
+                    "answer": output.answer,
+                    "confidence": output.confidence,
+                    "rationale": output.rationale,
+                }
+                for output in current
+            ]
+            shared_context = outputs_to_context(current, rationale_limit=None)
+            context = (
+                f"Debate round {round_index}. Every participant shared its complete position below:\n"
+                f"{shared_context}\n"
+                "Find your own previous position using your agent identifier, then critically compare every other "
+                "agent's rationale with it. Return a revised answer and a new rationale that explains which evidence "
+                "you accepted or rejected. Do not copy peer text verbatim."
+            )
+            contexts = [context] * len(self.agents)
             current = self._solve_agents(self.agents, item, contexts=contexts)
             all_outputs.extend(current)
             rounds_used = round_index
             trace.append(
                 {
                     "step": f"debate_round_{round_index}",
-                    "rationale_exchange": deliveries,
+                    "rationale_exchange": {
+                        "delivery_policy": "all_to_all",
+                        "participants": [agent.name for agent in self.agents],
+                        "positions": shared_positions,
+                    },
                     "outputs": [self._output_dict(item, output, include_role=False) for output in current],
                 }
             )

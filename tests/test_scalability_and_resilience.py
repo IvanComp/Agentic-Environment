@@ -146,6 +146,10 @@ class ScalabilityAndResilienceTest(unittest.TestCase):
                 run_experiment(limit=0, out=tmp_dir, echo=False)
             with self.assertRaisesRegex(ValueError, "temperature must be between 0 and 2"):
                 run_experiment(temperature=2.1, out=tmp_dir, echo=False)
+            with self.assertRaisesRegex(ValueError, "agent_count must be between 1 and 1000"):
+                run_experiment(agent_count=1001, out=tmp_dir, echo=False)
+            with self.assertRaisesRegex(ValueError, "max_tokens must be at least 16"):
+                run_experiment(max_tokens=15, out=tmp_dir, echo=False)
 
     def test_ui_rejects_empty_benchmark_or_mechanism_selection(self) -> None:
         with self.assertRaisesRegex(ValueError, "Select at least one"):

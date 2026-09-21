@@ -59,24 +59,19 @@ class DebateRationaleExchangeTest(unittest.TestCase):
         for agent_index, provider in enumerate(providers):
             self.assertEqual(len(provider.contexts), 2)
             round_context = provider.contexts[1]
-            self.assertIn("Critically compare every peer rationale", round_context)
+            self.assertIn("critically compare every other agent's rationale", round_context)
             self.assertIn(f"END_{provider.label}", round_context)
             for peer_index, peer in enumerate(providers):
                 if peer_index != agent_index:
                     self.assertIn(f"END_{peer.label}", round_context)
 
         exchange = result.trace[1]["rationale_exchange"]
-        for agent_index, delivery in enumerate(exchange):
-            expected_peers = {
-                f"A{peer_index + 1}"
-                for peer_index in range(len(agents))
-                if peer_index != agent_index
-            }
-            self.assertEqual(set(delivery["received_from"]), expected_peers)
-            self.assertEqual(
-                {entry["agent"] for entry in delivery["peer_rationales"]},
-                expected_peers,
-            )
+        self.assertEqual(exchange["delivery_policy"], "all_to_all")
+        self.assertEqual(exchange["participants"], ["A1", "A2", "A3"])
+        self.assertEqual(
+            {entry["agent"] for entry in exchange["positions"]},
+            {"A1", "A2", "A3"},
+        )
 
         calls = len(providers) * 2
         self.assertEqual(result.prompt_tokens, calls * 2)
