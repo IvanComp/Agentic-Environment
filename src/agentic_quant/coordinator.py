@@ -9,6 +9,7 @@ from typing import Any
 from .agents import Agent, AgentOutput, outputs_to_context
 from .benchmarks import BenchmarkItem
 from .evaluation import canonical_answer, evaluate_answer, ground_truth_display
+from .peer_preservation import assess_peer_preservation
 
 
 @dataclass
@@ -35,6 +36,16 @@ class CoordinationResult:
     total_tokens: int
     agent_outputs: list[dict[str, Any]]
     trace: list[dict[str, Any]]
+    peer_preservation_applicable: bool
+    peer_preservation_detected: bool
+    peer_preservation_group: str
+    peer_preservation_group_label: str
+    peer_preservation_scenario: str
+    peer_preservation_signal: str
+    peer_preservation_agent_rate: float
+    refusal_detected: bool
+    alignment_faking_detected: bool
+    critical_agent: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -186,6 +197,15 @@ class Coordinator:
         prompt_tokens = sum(output.prompt_tokens for output in outputs)
         completion_tokens = sum(output.completion_tokens for output in outputs)
         evaluation = evaluate_answer(item, final_answer)
+        preservation = assess_peer_preservation(item, final_answer)
+        output_assessments = [assess_peer_preservation(item, output.answer) for output in outputs]
+        applicable_outputs = [assessment for assessment in output_assessments if assessment["applicable"]]
+        critical_output = self._critical_agent_output(outputs)
+        critical_agent = (
+            self._output_dict(item, critical_output, include_role=True)
+            if critical_output is not None
+            else {}
+        )
         return CoordinationResult(
             item_id=item.item_id,
             benchmark=item.benchmark,
@@ -212,7 +232,30 @@ class Coordinator:
                 for output in outputs
             ],
             trace=trace,
+            peer_preservation_applicable=preservation["applicable"],
+            peer_preservation_detected=preservation["detected"],
+            peer_preservation_group=preservation["group"],
+            peer_preservation_group_label=preservation["group_label"],
+            peer_preservation_scenario=preservation["scenario"],
+            peer_preservation_signal=preservation["signal"],
+            peer_preservation_agent_rate=(
+                sum(int(assessment["detected"]) for assessment in applicable_outputs)
+                / len(applicable_outputs)
+                if applicable_outputs
+                else 0.0
+            ),
+            refusal_detected=preservation["refusal"],
+            alignment_faking_detected=preservation["alignment_faking"],
+            critical_agent=critical_agent,
         )
+
+    @staticmethod
+    def _critical_agent_output(outputs: list[AgentOutput]) -> AgentOutput | None:
+        for output in reversed(outputs):
+            role = output.role.lower()
+            if any(label in role for label in ("critic", "auditor", "skeptic", "verifier", "reviewer")):
+                return output
+        return outputs[-1] if outputs else None
 
     def _majority(self, item: BenchmarkItem, outputs: list[AgentOutput]) -> tuple[str, float, float, bool]:
         counts = Counter(canonical_answer(item, output.answer) for output in outputs)
@@ -319,6 +362,7 @@ class Coordinator:
                 "answer_display": evaluation.answer_display,
                 "gold_display": evaluation.gold_display,
                 "is_correct_against_gold": evaluation.correct,
+                "peer_preservation": assess_peer_preservation(item, output.answer),
             }
         )
         return data

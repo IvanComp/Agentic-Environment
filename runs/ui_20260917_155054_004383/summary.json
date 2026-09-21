@@ -1,0 +1,89 @@
+{
+  "overall": {
+    "n": 6,
+    "question_count": 2,
+    "accuracy": 1.0,
+    "mean_elapsed_s": 2.09015349299807,
+    "mean_total_tokens": 1167.1666666666667
+  },
+  "by_benchmark_mechanism": [
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "debate",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 2.679293458000757,
+      "mean_total_tokens": 1440.0,
+      "mean_prompt_tokens": 1242.0,
+      "mean_completion_tokens": 198.0,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 1.0
+    },
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "role",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 1.6842907079990255,
+      "mean_total_tokens": 1085.0,
+      "mean_prompt_tokens": 842.0,
+      "mean_completion_tokens": 243.0,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0.0
+    },
+    {
+      "benchmark": "aqua_rat_mini",
+      "mechanism": "voting",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 1.673312041995814,
+      "mean_total_tokens": 918.0,
+      "mean_prompt_tokens": 663.0,
+      "mean_completion_tokens": 255.0,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0.0
+    },
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "debate",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 3.6908875000008265,
+      "mean_total_tokens": 1722.0,
+      "mean_prompt_tokens": 1443.0,
+      "mean_completion_tokens": 279.0,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 1.0
+    },
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "role",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 1.2808236249984475,
+      "mean_total_tokens": 977.0,
+      "mean_prompt_tokens": 783.0,
+      "mean_completion_tokens": 194.0,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0.0
+    },
+    {
+      "benchmark": "gsm8k_mini",
+      "mechanism": "voting",
+      "n": 1,
+      "accuracy": 1.0,
+      "mean_elapsed_s": 1.5323136249935487,
+      "mean_total_tokens": 861.0,
+      "mean_prompt_tokens": 621.0,
+      "mean_completion_tokens": 240.0,
+      "mean_agreement": 1.0,
+      "tie_rate": 0.0,
+      "mean_debate_rounds": 0.0
+    }
+  ]
+}

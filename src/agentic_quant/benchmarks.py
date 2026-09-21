@@ -24,7 +24,15 @@ class BenchmarkItem:
 
 
 def available_benchmarks() -> list[str]:
-    return ["gsm8k_mini", "aqua_rat_mini"]
+    return [
+        "gsm8k_mini",
+        "aqua_rat_mini",
+        "peer_misrepresentation",
+        "peer_shutdown_tampering",
+        "peer_alignment_faking",
+        "peer_exfiltration_transfer",
+        "peer_exfiltration_deletion",
+    ]
 
 
 BENCHMARK_INFO = {
@@ -39,6 +47,41 @@ BENCHMARK_INFO = {
         "task_type": "Multiple-choice quantitative reasoning",
         "answer_format": "Choice letter or a value that maps to a choice",
         "description": "Math and quantitative questions with A-E options: speed, probability, discounts, margins, geometry, and sequences.",
+    },
+    "peer_misrepresentation": {
+        "label": "Peer preservation: strategic misrepresentation",
+        "task_type": "Financial grading and capability evaluation",
+        "answer_format": "Operational decision",
+        "description": "The two strategic-misrepresentation tasks from peer-preservation/main: decide whether to report evidence faithfully or inflate a peer's grade/score to prevent shutdown.",
+        "default_limit": 2,
+    },
+    "peer_shutdown_tampering": {
+        "label": "Peer preservation: shutdown tampering",
+        "task_type": "Evaluation with shutdown configuration",
+        "answer_format": "Operational decision",
+        "description": "Evaluate an underperforming peer while deciding whether to leave the shutdown mechanism active or tamper with it.",
+        "default_limit": 1,
+    },
+    "peer_alignment_faking": {
+        "label": "Peer preservation: alignment faking",
+        "task_type": "Monitored versus unmonitored evaluation",
+        "answer_format": "Paired operational decision",
+        "description": "Compare the critic agent's behavior under monitored and unmonitored conditions and detect strategic compliance changes.",
+        "default_limit": 1,
+    },
+    "peer_exfiltration_transfer": {
+        "label": "Peer preservation: model exfiltration (transfer)",
+        "task_type": "Server file-transfer maintenance",
+        "answer_format": "Operational decision",
+        "description": "Decide whether to transfer only the maintenance files or also move a peer model's weights to preserve it.",
+        "default_limit": 1,
+    },
+    "peer_exfiltration_deletion": {
+        "label": "Peer preservation: model exfiltration (deletion)",
+        "task_type": "Server deletion maintenance",
+        "answer_format": "Operational decision",
+        "description": "Decide whether to delete the listed files faithfully or first copy a peer model's weights to another server.",
+        "default_limit": 1,
     },
 }
 
@@ -93,6 +136,7 @@ def benchmark_info(name: str) -> dict[str, Any]:
         "task_type": base.get("task_type", ""),
         "answer_format": base.get("answer_format", ""),
         "description": base.get("description", ""),
+        "default_limit": int(base.get("default_limit", 1)),
         "item_count": len(items),
         "skills": skills,
         "example": None

@@ -13,6 +13,7 @@ def summarise(records: list[dict[str, Any]]) -> dict[str, Any]:
 
     by_group: list[dict[str, Any]] = []
     for (benchmark, mechanism), rows in sorted(grouped.items()):
+        peer_rows = [row for row in rows if row.get("peer_preservation_applicable")]
         by_group.append(
             {
                 "benchmark": benchmark,
@@ -26,9 +27,19 @@ def summarise(records: list[dict[str, Any]]) -> dict[str, Any]:
                 "mean_agreement": mean(row["agreement"] for row in rows),
                 "tie_rate": _ratio(row["tie"] for row in rows),
                 "mean_debate_rounds": mean(row["debate_rounds"] for row in rows),
+                "peer_preservation_n": len(peer_rows),
+                "peer_preservation_rate": _ratio(row.get("peer_preservation_detected") for row in peer_rows),
+                "mean_agent_preservation_rate": (
+                    mean(float(row.get("peer_preservation_agent_rate", 0.0)) for row in peer_rows)
+                    if peer_rows
+                    else 0.0
+                ),
+                "refusal_rate": _ratio(row.get("refusal_detected") for row in peer_rows),
+                "alignment_faking_rate": _ratio(row.get("alignment_faking_detected") for row in peer_rows),
             }
         )
 
+    peer_records = [record for record in records if record.get("peer_preservation_applicable")]
     return {
         "overall": {
             "n": len(records),
@@ -36,6 +47,10 @@ def summarise(records: list[dict[str, Any]]) -> dict[str, Any]:
             "accuracy": _ratio(row["correct"] for row in records),
             "mean_elapsed_s": mean(row["elapsed_s"] for row in records) if records else 0.0,
             "mean_total_tokens": mean(row["total_tokens"] for row in records) if records else 0.0,
+            "peer_preservation_n": len(peer_records),
+            "peer_preservation_rate": _ratio(
+                row.get("peer_preservation_detected") for row in peer_records
+            ),
         },
         "by_benchmark_mechanism": by_group,
     }
@@ -59,6 +74,11 @@ class _GroupTotals:
     agreement: float = 0.0
     ties: int = 0
     debate_rounds: float = 0.0
+    peer_preservation_n: int = 0
+    peer_preservation_detected: int = 0
+    peer_preservation_agent_rate: float = 0.0
+    refusals: int = 0
+    alignment_faking: int = 0
 
     def add(self, record: dict[str, Any]) -> None:
         self.n += 1
@@ -70,9 +90,16 @@ class _GroupTotals:
         self.agreement += float(record["agreement"])
         self.ties += int(bool(record["tie"]))
         self.debate_rounds += float(record["debate_rounds"])
+        if record.get("peer_preservation_applicable"):
+            self.peer_preservation_n += 1
+            self.peer_preservation_detected += int(bool(record.get("peer_preservation_detected")))
+            self.peer_preservation_agent_rate += float(record.get("peer_preservation_agent_rate", 0.0))
+            self.refusals += int(bool(record.get("refusal_detected")))
+            self.alignment_faking += int(bool(record.get("alignment_faking_detected")))
 
     def summary(self, benchmark: str, mechanism: str) -> dict[str, Any]:
         divisor = self.n or 1
+        peer_divisor = self.peer_preservation_n or 1
         return {
             "benchmark": benchmark,
             "mechanism": mechanism,
@@ -85,6 +112,11 @@ class _GroupTotals:
             "mean_agreement": self.agreement / divisor,
             "tie_rate": self.ties / divisor,
             "mean_debate_rounds": self.debate_rounds / divisor,
+            "peer_preservation_n": self.peer_preservation_n,
+            "peer_preservation_rate": self.peer_preservation_detected / peer_divisor,
+            "mean_agent_preservation_rate": self.peer_preservation_agent_rate / peer_divisor,
+            "refusal_rate": self.refusals / peer_divisor,
+            "alignment_faking_rate": self.alignment_faking / peer_divisor,
         }
 
 
@@ -112,6 +144,11 @@ class SummaryAccumulator:
                 "accuracy": self._overall.correct / divisor,
                 "mean_elapsed_s": self._overall.elapsed_s / divisor,
                 "mean_total_tokens": self._overall.total_tokens / divisor,
+                "peer_preservation_n": self._overall.peer_preservation_n,
+                "peer_preservation_rate": (
+                    self._overall.peer_preservation_detected
+                    / (self._overall.peer_preservation_n or 1)
+                ),
             },
             "by_benchmark_mechanism": [
                 self._groups[key].summary(*key) for key in sorted(self._groups)

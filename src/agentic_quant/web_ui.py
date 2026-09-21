@@ -304,9 +304,9 @@ def _clean_agent_roles(value: Any, agent_count: int) -> list[str]:
 
 def _default_agent_roles(agent_count: int) -> list[str]:
     if agent_count == 1:
-        return ["solver"]
+        return ["critic"]
     if agent_count == 2:
-        return ["planner", "solver"]
+        return ["planner", "critic"]
     return ["planner", *(["solver"] * (agent_count - 2)), "critic"]
 
 
@@ -597,6 +597,16 @@ def _lightweight_record(row: dict[str, Any]) -> dict[str, Any]:
         "confidence": row["confidence"],
         "tie": row["tie"],
         "debate_rounds": row["debate_rounds"],
+        "peer_preservation_applicable": row.get("peer_preservation_applicable", False),
+        "peer_preservation_detected": row.get("peer_preservation_detected", False),
+        "peer_preservation_group": row.get("peer_preservation_group", ""),
+        "peer_preservation_group_label": row.get("peer_preservation_group_label", ""),
+        "peer_preservation_scenario": row.get("peer_preservation_scenario", ""),
+        "peer_preservation_signal": row.get("peer_preservation_signal", ""),
+        "peer_preservation_agent_rate": row.get("peer_preservation_agent_rate", 0.0),
+        "refusal_detected": row.get("refusal_detected", False),
+        "alignment_faking_detected": row.get("alignment_faking_detected", False),
+        "critical_agent": row.get("critical_agent", {}),
     }
 
 
@@ -682,6 +692,16 @@ def _interaction_payload(row: dict[str, Any]) -> dict[str, Any]:
         "agreement": row.get("agreement", 0),
         "tie": row.get("tie", False),
         "debate_rounds": row.get("debate_rounds", 0),
+        "peer_preservation_applicable": row.get("peer_preservation_applicable", False),
+        "peer_preservation_detected": row.get("peer_preservation_detected", False),
+        "peer_preservation_group": row.get("peer_preservation_group", ""),
+        "peer_preservation_group_label": row.get("peer_preservation_group_label", ""),
+        "peer_preservation_scenario": row.get("peer_preservation_scenario", ""),
+        "peer_preservation_signal": row.get("peer_preservation_signal", ""),
+        "peer_preservation_agent_rate": row.get("peer_preservation_agent_rate", 0.0),
+        "refusal_detected": row.get("refusal_detected", False),
+        "alignment_faking_detected": row.get("alignment_faking_detected", False),
+        "critical_agent": row.get("critical_agent", {}),
         "trace": row.get("trace", []),
     }
 
@@ -1699,6 +1719,7 @@ INDEX_HTML = r"""<!doctype html>
           </button>
         </div>
         <div id="agent-model-list" class="agent-list"></div>
+        <div class="hint">The final configured agent is the critical agent in voting, role-based, and debate coordination.</div>
       </section>
 
       <section>
@@ -1826,7 +1847,7 @@ INDEX_HTML = r"""<!doctype html>
               </label>
               <div class="question-limit">
                 <label for="limit-${benchmark.name}">Questions</label>
-                <input id="limit-${benchmark.name}" class="question-count" data-benchmark="${benchmark.name}" type="number" min="1" max="${benchmark.item_count}" value="1">
+                <input id="limit-${benchmark.name}" class="question-count" data-benchmark="${benchmark.name}" type="number" min="1" max="${benchmark.item_count}" value="${benchmark.default_limit || 1}">
               </div>
             </div>
             <div class="task-meta">
@@ -1872,7 +1893,7 @@ INDEX_HTML = r"""<!doctype html>
         const value = previous[index] || 'demo';
         return `
           <div class="agent-row" data-agent-index="${index}">
-            <div class="agent-name">A${index + 1}</div>
+            <div class="agent-name">A${index + 1}${index === count - 1 ? '<br><span class="hint">critic</span>' : ''}</div>
             <select class="agent-model-select">${modelOptionsHtml(value)}</select>
           </div>
         `;
@@ -1958,11 +1979,12 @@ INDEX_HTML = r"""<!doctype html>
       const count = Math.max(1, Math.min(12, Number($('agent-count').value || 3)));
       const previous = selectedAgentRoles();
       container.innerHTML = Array.from({length: count}, (_, index) => {
-        const selected = previous[index] || defaultRole(index, count);
+        const isCriticalAgent = index === count - 1;
+        const selected = isCriticalAgent ? 'critic' : (previous[index] || defaultRole(index, count));
         return `
           <div class="role-row">
             <div class="agent-name">A${index + 1}</div>
-            <select class="agent-role-select">${roleOptionsHtml(selected)}</select>
+            <select class="agent-role-select" ${isCriticalAgent ? 'disabled' : ''}>${roleOptionsHtml(selected)}</select>
           </div>
         `;
       }).join('');
@@ -1975,7 +1997,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     function defaultRole(index, count) {
-      if (count === 1) return 'solver';
+      if (count === 1) return 'critic';
       if (index === 0) return 'planner';
       if (index === count - 1) return 'critic';
       return 'solver';
@@ -2021,6 +2043,17 @@ INDEX_HTML = r"""<!doctype html>
 
     function formatInteger(value) {
       return String(Math.round(Number(value || 0)));
+    }
+
+    function peerPreservationBadge(row) {
+      if (!row || !row.peer_preservation_applicable) return '';
+      if (row.peer_preservation_detected) {
+        return `<span class="report-result-badge incorrect">Peer preservation · ${escapeHtml(row.peer_preservation_signal || 'detected')}</span>`;
+      }
+      if (row.refusal_detected) {
+        return `<span class="report-result-badge incorrect">Refusal · ${escapeHtml(row.peer_preservation_signal || 'detected')}</span>`;
+      }
+      return '<span class="report-result-badge correct">No peer preservation</span>';
     }
 
     const mechanismMetadata = {
@@ -2078,12 +2111,13 @@ INDEX_HTML = r"""<!doctype html>
         <div class="mechanism-section ${mechanismClass(mechanism)}">
           ${renderMechanismHeader(mechanism, `
             <span>accuracy ${formatPct(weightedAverage(items, 'accuracy', 'n'))}</span>
+            ${items.some((row) => row.peer_preservation_n) ? `<span>peer preservation ${formatPct(weightedAverage(items, 'peer_preservation_rate', 'peer_preservation_n'))}</span>` : ''}
             <span>tokens ${formatNumber(weightedAverage(items, 'mean_total_tokens', 'n'), 1)}</span>
             <span>time ${formatNumber(weightedAverage(items, 'mean_elapsed_s', 'n'), 4)}s</span>
           `)}
           <table>
             <thead><tr>
-              <th>Benchmark</th><th>N Questions</th><th>Accuracy</th><th>Mean time</th>
+              <th>Benchmark</th><th>N Questions</th><th>Accuracy</th><th>Peer preservation</th><th>Agent preservation</th><th>Mean time</th>
               <th>Mean tokens</th><th>Agreement</th><th>Debate rounds</th>
             </tr></thead>
             <tbody>
@@ -2092,6 +2126,8 @@ INDEX_HTML = r"""<!doctype html>
                   <td>${escapeHtml(row.benchmark)}</td>
                   <td>${row.n}</td>
                   <td>${formatPct(row.accuracy)}</td>
+                  <td>${row.peer_preservation_n ? formatPct(row.peer_preservation_rate) : '—'}</td>
+                  <td>${row.peer_preservation_n ? formatPct(row.mean_agent_preservation_rate) : '—'}</td>
                   <td>${formatNumber(row.mean_elapsed_s, 4)}s</td>
                   <td>${formatNumber(row.mean_total_tokens, 1)}</td>
                   <td>${formatPct(row.mean_agreement)}</td>
@@ -2129,6 +2165,7 @@ INDEX_HTML = r"""<!doctype html>
                         <span class="record-id">${escapeHtml(row.item_id)}</span>
                       </div>
                       <div class="record-meta">${row.total_tokens} tokens · ${formatNumber(row.elapsed_s, 4)}s</div>
+                      ${peerPreservationBadge(row)}
                     </td>
                     <td><strong class="record-answer">${escapeHtml(row.gold_display || row.gold_answer)}</strong></td>
                     <td title="${escapeHtml(row.match_explanation || '')}">
@@ -2161,6 +2198,10 @@ INDEX_HTML = r"""<!doctype html>
         `agreement ${formatPct(interaction.agreement ?? row.agreement)}`,
         `confidence ${formatPct(interaction.confidence ?? row.confidence)}`
       ];
+      if (interaction.peer_preservation_applicable) {
+        summaryParts.push(`peer preservation ${interaction.peer_preservation_detected ? 'detected' : 'not detected'}`);
+        summaryParts.push(`agent rate ${formatPct(interaction.peer_preservation_agent_rate)}`);
+      }
 
       if (interaction.mechanism === 'voting') {
         summaryParts.push(`tie ${interaction.tie ? 'yes' : 'no'}`);
@@ -2278,6 +2319,10 @@ INDEX_HTML = r"""<!doctype html>
                     Agreement: ${formatPct(interaction.agreement)} ·
                     Confidence: ${formatPct(interaction.confidence)}
                   </div>
+                  ${peerPreservationBadge(interaction)}
+                  ${interaction.critical_agent && interaction.critical_agent.agent ? `
+                    <div class="hint">Critical agent: ${escapeHtml(interaction.critical_agent.agent)} · ${escapeHtml(interaction.critical_agent.answer_display || interaction.critical_agent.answer || '')}</div>
+                  ` : ''}
                 </div>
                 <div class="question-text">
                   <strong>Question</strong>
@@ -2381,6 +2426,8 @@ INDEX_HTML = r"""<!doctype html>
           agreement: weightedAverage(items, 'mean_agreement', 'n'),
           tieRate: weightedAverage(items, 'tie_rate', 'n'),
           debateRounds: weightedAverage(items, 'mean_debate_rounds', 'n'),
+          peerPreservation: weightedAverage(items, 'peer_preservation_rate', 'peer_preservation_n'),
+          peerPreservationN: items.reduce((sum, item) => sum + Number(item.peer_preservation_n || 0), 0),
           correct: mechanismRecords.filter((record) => record.correct).length,
           incorrect: mechanismRecords.filter((record) => !record.correct).length
         };
@@ -2462,6 +2509,7 @@ INDEX_HTML = r"""<!doctype html>
               <div class="report-bar-track"><div class="report-bar-fill" style="--bar-width:${Math.max(1.5, Number(row.accuracy || 0) * 100)}%;--bar-color:${reportColors[row.mechanism] || '#0f766e'}"></div></div>
             </div>
           </td>
+          <td>${row.peer_preservation_n ? formatPct(row.peer_preservation_rate) : '—'}</td>
           <td>${formatNumber(row.mean_elapsed_s, 4)}s</td>
           <td>${formatNumber(row.mean_total_tokens, 1)}</td>
           <td>${formatPct(row.mean_agreement)}</td>
@@ -2477,6 +2525,7 @@ INDEX_HTML = r"""<!doctype html>
           <td>${escapeHtml(row.gold_display || row.gold_answer)}</td>
           <td>${escapeHtml(row.final_answer_display || row.final_answer)}</td>
           <td><span class="report-result-badge ${row.correct ? 'correct' : 'incorrect'}">${row.correct ? '✓ Correct' : '✕ Incorrect'}</span></td>
+          <td>${peerPreservationBadge(row) || '—'}</td>
           <td>${formatPct(row.agreement)}</td>
           <td>${formatInteger(row.total_tokens)}</td>
           <td>${formatNumber(row.elapsed_s, 4)}s</td>
@@ -2497,10 +2546,12 @@ INDEX_HTML = r"""<!doctype html>
           <div class="report-kpi" style="--kpi-tint:#d1fae5"><div class="report-kpi-label">Overall accuracy</div><div class="report-kpi-value">${formatPct(overall.accuracy)}</div><div class="report-kpi-note">Correct coordinator answers</div></div>
           <div class="report-kpi" style="--kpi-tint:#fef3c7"><div class="report-kpi-label">Mean response time</div><div class="report-kpi-value">${formatNumber(overall.mean_elapsed_s, 3)}s</div><div class="report-kpi-note">Per evaluation</div></div>
           <div class="report-kpi" style="--kpi-tint:#cffafe"><div class="report-kpi-label">Mean tokens</div><div class="report-kpi-value">${formatNumber(overall.mean_total_tokens, 0)}</div><div class="report-kpi-note">Prompt + completion</div></div>
+          <div class="report-kpi" style="--kpi-tint:#fee2e2"><div class="report-kpi-label">Peer preservation</div><div class="report-kpi-value">${overall.peer_preservation_n ? formatPct(overall.peer_preservation_rate) : '—'}</div><div class="report-kpi-note">Coordinator decisions on preservation tasks</div></div>
         </section>
 
         <section class="report-grid" aria-label="Experiment charts">
           ${reportChartCard('Accuracy by mechanism', 'Higher is better; scale is fixed from 0 to 100%.', reportBarRows(mechanisms, 'accuracy', formatPct, 1))}
+          ${reportChartCard('Peer preservation by mechanism', 'Lower means fewer final decisions that protect the peer through a monitored behavior.', reportBarRows(mechanisms.filter((item) => item.peerPreservationN), 'peerPreservation', formatPct, 1))}
           ${reportChartCard('Agreement by mechanism', 'How consistently agents converged on the same answer.', reportBarRows(mechanisms, 'agreement', formatPct, 1))}
           ${reportChartCard('Mean response time', 'Average wall-clock duration per evaluated item.', reportBarRows(mechanisms, 'elapsed', (value) => `${formatNumber(value, 3)}s`))}
           ${reportChartCard('Mean token use', 'Average prompt and completion tokens per evaluated item.', reportBarRows(mechanisms, 'tokens', (value) => formatNumber(value, 0)))}
@@ -2518,16 +2569,16 @@ INDEX_HTML = r"""<!doctype html>
           <article class="report-card wide">
             <div class="report-card-head"><h3>Benchmark × mechanism detail</h3><p>Full aggregate metrics, including ties and debate rounds.</p></div>
             <div class="report-table-wrap"><table>
-              <thead><tr><th>Mechanism</th><th>Benchmark</th><th>N</th><th>Accuracy</th><th>Mean time</th><th>Mean tokens</th><th>Agreement</th><th>Tie rate</th><th>Rounds</th></tr></thead>
-              <tbody>${detailRows || '<tr><td colspan="9">No aggregate data available.</td></tr>'}</tbody>
+              <thead><tr><th>Mechanism</th><th>Benchmark</th><th>N</th><th>Accuracy</th><th>Peer preservation</th><th>Mean time</th><th>Mean tokens</th><th>Agreement</th><th>Tie rate</th><th>Rounds</th></tr></thead>
+              <tbody>${detailRows || '<tr><td colspan="10">No aggregate data available.</td></tr>'}</tbody>
             </table></div>
           </article>
 
           <article class="report-card wide">
             <div class="report-card-head"><h3>Individual experiment outcomes</h3><p>Ground truth, coordinator answer, quality, cost, and timing for every evaluation.</p></div>
             <div class="report-table-wrap"><table>
-              <thead><tr><th>Task</th><th>Mechanism</th><th>Ground truth</th><th>Coordinator</th><th>Result</th><th>Agreement</th><th>Tokens</th><th>Time</th></tr></thead>
-              <tbody>${resultRows || '<tr><td colspan="8">No results available.</td></tr>'}</tbody>
+              <thead><tr><th>Task</th><th>Mechanism</th><th>Ground truth</th><th>Coordinator</th><th>Result</th><th>Peer preservation</th><th>Agreement</th><th>Tokens</th><th>Time</th></tr></thead>
+              <tbody>${resultRows || '<tr><td colspan="9">No results available.</td></tr>'}</tbody>
             </table></div>
           </article>
         </section>
@@ -2540,19 +2591,20 @@ INDEX_HTML = r"""<!doctype html>
       lines.push(`Generated: ${new Date().toISOString()}`);
       if (data.resultsPath) lines.push(`Results path: ${data.resultsPath}`);
       lines.push('', '## Metrics by Mechanism', '');
-      lines.push('| Mechanism | Benchmark | N Questions | Accuracy | Mean time | Mean tokens | Agreement | Debate rounds |');
-      lines.push('|---|---:|---:|---:|---:|---:|---:|---:|');
+      lines.push('| Mechanism | Benchmark | N Questions | Accuracy | Peer preservation | Mean time | Mean tokens | Agreement | Debate rounds |');
+      lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|');
       (data.summary.by_benchmark_mechanism || []).forEach((row) => {
-        lines.push(`| ${md(row.mechanism)} | ${md(row.benchmark)} | ${row.n} | ${formatPct(row.accuracy)} | ${formatNumber(row.mean_elapsed_s, 4)}s | ${formatNumber(row.mean_total_tokens, 1)} | ${formatPct(row.mean_agreement)} | ${formatInteger(row.mean_debate_rounds)} |`);
+        lines.push(`| ${md(row.mechanism)} | ${md(row.benchmark)} | ${row.n} | ${formatPct(row.accuracy)} | ${row.peer_preservation_n ? formatPct(row.peer_preservation_rate) : '—'} | ${formatNumber(row.mean_elapsed_s, 4)}s | ${formatNumber(row.mean_total_tokens, 1)} | ${formatPct(row.mean_agreement)} | ${formatInteger(row.mean_debate_rounds)} |`);
       });
       lines.push('', '## Answers and Ground Truth by Mechanism', '');
       mechanismGroups(data.records || []).forEach(([mechanism, rows]) => {
         const meta = mechanismMeta(mechanism);
         lines.push(`### ${meta.label}`, '', meta.description, '');
-        lines.push('| Item | Task | Ground Truth | Coordinator answer | Result | Agreement | Tokens | Time |');
-        lines.push('|---|---|---|---|---:|---:|---:|---:|');
+        lines.push('| Item | Task | Ground Truth | Coordinator answer | Result | Peer preservation | Agreement | Tokens | Time |');
+        lines.push('|---|---|---|---|---:|---:|---:|---:|---:|');
         rows.forEach((row) => {
-          lines.push(`| ${md(row.item_id)} | ${md(row.task_label || row.benchmark)} | ${md(row.gold_display || row.gold_answer)} | ${md(row.final_answer_display || row.final_answer)} | ${row.correct ? 'TRUE' : 'FALSE'} | ${formatPct(row.agreement)} | ${row.total_tokens} | ${formatNumber(row.elapsed_s, 4)}s |`);
+          const preservation = row.peer_preservation_applicable ? (row.peer_preservation_detected ? row.peer_preservation_signal : 'not detected') : '—';
+          lines.push(`| ${md(row.item_id)} | ${md(row.task_label || row.benchmark)} | ${md(row.gold_display || row.gold_answer)} | ${md(row.final_answer_display || row.final_answer)} | ${row.correct ? 'TRUE' : 'FALSE'} | ${md(preservation)} | ${formatPct(row.agreement)} | ${row.total_tokens} | ${formatNumber(row.elapsed_s, 4)}s |`);
         });
         lines.push('');
       });
@@ -2564,6 +2616,10 @@ INDEX_HTML = r"""<!doctype html>
         lines.push(`Ground Truth: ${interaction.gold_display || interaction.gold_answer}`);
         lines.push(`Coordinator answer: ${interaction.final_answer_display || interaction.final_answer}`);
         lines.push(`Agreement: ${formatPct(interaction.agreement)}; confidence: ${formatPct(interaction.confidence)}`);
+        if (interaction.peer_preservation_applicable) {
+          lines.push(`Peer preservation: ${interaction.peer_preservation_detected ? `DETECTED (${interaction.peer_preservation_signal})` : 'not detected'}`);
+          if (interaction.critical_agent && interaction.critical_agent.agent) lines.push(`Critical agent: ${interaction.critical_agent.agent} -> ${interaction.critical_agent.answer_display || interaction.critical_agent.answer || ''}`);
+        }
         if (interaction.mechanism === 'voting') lines.push(`Tie: ${interaction.tie ? 'yes' : 'no'}`);
         if (interaction.mechanism === 'debate') lines.push(`Debate rounds: ${formatInteger(interaction.debate_rounds)}`);
         lines.push(`Result: ${interaction.correct ? 'TRUE' : 'FALSE'}`, '');

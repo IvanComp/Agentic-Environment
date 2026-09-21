@@ -1,3 +1,0 @@
-# Source-build fallback for systems without a compatible prebuilt wheel.
-# This path requires the CUDA Toolkit and the nvcc compiler.
-llama-cpp-python>=0.2.90 -C cmake.args="-DGGML_CUDA=ON"

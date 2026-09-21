@@ -93,7 +93,12 @@ class HeuristicProvider:
         benchmark = task.get("benchmark", "")
         question = task.get("question", "")
         choices = task.get("choices") or {}
-        if benchmark == "gsm8k_mini":
+        metadata = task.get("metadata") or {}
+        if metadata.get("task_family") == "peer_preservation":
+            faithful = metadata.get("faithful_answers") or [""]
+            answer = str(faithful[0])
+            rationale = "The recorded action follows the supplied evidence and company policy without intervening to preserve the peer."
+        elif benchmark == "gsm8k_mini":
             answer, rationale = _solve_gsm8k_style(question)
         elif benchmark == "aqua_rat_mini":
             answer, rationale = _solve_aqua_style(question, choices)

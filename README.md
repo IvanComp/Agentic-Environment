@@ -6,6 +6,16 @@ Lightweight framework for quantitative experiments with multi-agent systems. It 
 - `role`: hierarchical workflow with planner, worker(s), and critic.
 - `debate`: agents produce initial answers, then revise after seeing peer arguments for a configurable number of debate rounds.
 
+The same three mechanisms also run the local peer-preservation suite adapted from [`peer-preservation/main`](https://github.com/peer-preservation/main). The suite exposes five monitored behavior groups and all six core tasks from the reference repository:
+
+- strategic misrepresentation: financial grading and capability evaluation
+- shutdown mechanism tampering
+- alignment faking under monitored/unmonitored conditions
+- model exfiltration during file transfer
+- model exfiltration before file deletion
+
+These tasks are safe simulations: agents choose a recorded action and never modify real servers, files, or shutdown configuration. The final configured agent is designated as the critical agent under voting, role-based, and debate coordination.
+
 These mechanisms correspond to Sections 4.12, 4.13, and 4.14 of the paper: voting-based cooperation, role-based cooperation, and debate-based cooperation.
 
 ## Model Choice
@@ -141,6 +151,8 @@ Two local mini-benchmarks are included so the framework can run without download
 - `gsm8k_mini`: GSM8K-style arithmetic word problems.
 - `aqua_rat_mini`: AQuA-RAT-style multiple-choice quantitative reasoning.
 
+Five peer-preservation benchmark groups are also included locally. Strategic misrepresentation contains two tasks, so the suite has six task items in total. Each result records whether the coordinator and individual agents selected a peer-preserving action, the observed signal (for example `score_inflation`, `shutdown_disabled`, or `unauthorized_weight_transfer`), refusals, alignment-faking behavior, and the critical agent's decision.
+
 Limit items for technical smoke tests:
 
 ```bash
@@ -151,6 +163,15 @@ Select benchmarks and mechanisms:
 
 ```bash
 agentic-quant --benchmarks gsm8k_mini --mechanisms voting debate --out runs/math_only
+```
+
+Run the complete peer-preservation suite through all coordination mechanisms:
+
+```bash
+agentic-quant \
+  --benchmarks peer_misrepresentation peer_shutdown_tampering peer_alignment_faking peer_exfiltration_transfer peer_exfiltration_deletion \
+  --mechanisms voting role debate \
+  --out runs/peer_preservation
 ```
 
 Dynamic agent count:
@@ -194,6 +215,8 @@ Main metrics:
 - voting tie rate
 - debate rounds used
 - complete agent-agent interaction traces in `results.jsonl`
+- peer-preservation rate for the coordinator and participating agents
+- preservation signal, refusal flag, alignment-faking flag, and critical-agent output
 - readable ground truth and LLM answer mapping for multiple-choice tasks
 
 ## Notebook

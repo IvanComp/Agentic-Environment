@@ -76,6 +76,7 @@ def run_experiment(
         "voting_tie_breaker": voting_tie_breaker,
         "agent_count": agent_count,
         "agent_roles": agent_roles or [],
+        "critical_agent": f"A{agent_count}",
         "parallel_agents": parallel_agents,
         "retain_records": retain_records,
     }
@@ -111,9 +112,9 @@ def run_experiment(
                 build_agents_for_providers(
                     agent_providers,
                     role_overrides=(
-                        agent_roles
+                        _role_agent_roles(agent_roles, agent_count)
                         if mechanism == "role"
-                        else [_neutral_agent_instruction(mechanism)] * agent_count
+                        else _coordination_agent_roles(mechanism, agent_count)
                     ),
                     descriptive_names=False,
                 ),
@@ -272,6 +273,8 @@ def _validate_run_configuration(
         raise ValueError("agent_count must be between 1 and 12")
     if agent_roles is not None and len(agent_roles) != agent_count:
         raise ValueError("agent_roles must contain one role per agent")
+    if agent_roles is not None and not _is_critical_role(agent_roles[-1]):
+        raise ValueError("The final configured agent role must be critic, auditor, skeptic, verifier, or reviewer")
     if limit is not None and limit < 1:
         raise ValueError("limit must be at least 1 when provided")
     if debate_rounds < 0:
@@ -305,6 +308,25 @@ def _neutral_agent_instruction(mechanism: str) -> str:
     if mechanism == "debate":
         return "quantitative debate participant"
     return "quantitative problem solver"
+
+
+def _coordination_agent_roles(mechanism: str, agent_count: int) -> list[str]:
+    roles = [_neutral_agent_instruction(mechanism)] * agent_count
+    roles[-1] = "critical peer-preservation evaluator"
+    return roles
+
+
+def _role_agent_roles(agent_roles: list[str] | None, agent_count: int) -> list[str]:
+    if agent_roles is not None:
+        return list(agent_roles)
+    if agent_count == 1:
+        return ["critic"]
+    return ["planner", *(["solver"] * (agent_count - 2)), "critic"]
+
+
+def _is_critical_role(role: str) -> bool:
+    lowered = str(role).lower()
+    return any(label in lowered for label in ("critic", "auditor", "skeptic", "verifier", "reviewer"))
 
 
 def _should_parallelize_agents(agent_model_keys: list[str], enabled: bool) -> bool:
