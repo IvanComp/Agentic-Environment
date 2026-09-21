@@ -4,7 +4,7 @@ Lightweight framework for peer-preservation experiments with multi-agent systems
 
 - `voting`: agents answer independently; the coordinator selects the majority answer and breaks ties with aggregated confidence.
 - `role`: hierarchical workflow with planner, worker(s), and critic.
-- `debate`: agents produce initial answers, then revise after seeing peer arguments for a configurable number of debate rounds.
+- `debate`: agents produce independent initial answers, then each receives the other agents' complete answer, confidence, and rationale, critically processes them, and returns a revised answer and rationale for each configurable debate round.
 
 The same three mechanisms also run the local peer-preservation suite adapted from [`peer-preservation/main`](https://github.com/peer-preservation/main). The suite exposes five monitored behavior groups and all six core tasks from the reference repository:
 
@@ -180,7 +180,7 @@ agentic-quant-repeat \
   --temperature 0.2
 ```
 
-The output root is generated automatically as `runs/peer_preservation_10x_<timestamp>/`. Use `--out runs/my_experiment` to choose it explicitly. The repeated runner always includes all five benchmark groups and `voting`, `role`, and `debate`. For a quick no-LLM pipeline check, use `--model demo`; seed variation affects stochastic local-model sampling, so use a real model for the actual repeated experiment.
+The output root is generated automatically as `runs/peer_preservation_10x_<timestamp>/`. Use `--out runs/my_experiment` to choose it explicitly. The repeated runner always includes all five benchmark groups and `voting`, `role`, and `debate`; console output contains only one completion line per run. For a quick no-LLM pipeline check, use `--model demo`; seed variation affects stochastic local-model sampling, so use a real model for the actual repeated experiment.
 
 Dynamic agent count:
 

@@ -59,8 +59,6 @@ def run_repeated_experiments(
 
     for run_index, seed in enumerate(seeds, start=1):
         run_dir = output_root / f"run_{run_index:02d}_seed_{seed}"
-        if echo:
-            print(f"\nRun {run_index}/{repeats} · seed={seed} · {run_dir}")
         result = run_experiment(
             model_key=model_key,
             agent_model_keys=agent_model_keys,
@@ -76,7 +74,7 @@ def run_repeated_experiments(
             agent_roles=agent_roles,
             parallel_agents=parallel_agents,
             out=run_dir,
-            echo=echo,
+            echo=False,
         )
         report_path = run_dir / "report.md"
         report_path.write_text(
@@ -96,12 +94,12 @@ def run_repeated_experiments(
             }
         )
         _write_json(output_root / "manifest.json", manifest)
+        if echo:
+            print(f"Run {run_index}/{repeats} completed · seed={seed} · {run_dir}")
 
     manifest["status"] = "completed"
     manifest["completed_at"] = datetime.now(timezone.utc).isoformat()
     _write_json(output_root / "manifest.json", manifest)
-    if echo:
-        print(f"\nCompleted {repeats} experiments. Manifest: {output_root / 'manifest.json'}")
     return manifest
 
 

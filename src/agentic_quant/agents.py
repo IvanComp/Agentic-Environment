@@ -200,13 +200,21 @@ def _role_override(role_overrides: list[str] | None, index: int) -> str:
     return str(role_overrides[index]).strip()
 
 
-def outputs_to_context(outputs: list[AgentOutput]) -> str:
+def outputs_to_context(
+    outputs: list[AgentOutput],
+    *,
+    rationale_limit: int | None = 360,
+) -> str:
     compact = [
         {
             "agent": output.agent,
             "answer": output.answer,
             "confidence": output.confidence,
-            "rationale": _compact_text(output.rationale),
+            "rationale": (
+                output.rationale
+                if rationale_limit is None
+                else _compact_text(output.rationale, limit=rationale_limit)
+            ),
         }
         for output in outputs
     ]

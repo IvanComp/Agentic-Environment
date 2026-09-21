@@ -160,18 +160,50 @@ class Coordinator:
                 "outputs": [self._output_dict(item, output, include_role=False) for output in current],
             }
         ]
+        all_outputs = list(current)
         rounds_used = 0
 
         for round_index in range(1, self.debate_rounds + 1):
-            context = (
-                f"Debate round {round_index}. Review peer answers and revise if their evidence is stronger:\n"
-                f"{outputs_to_context(current)}"
-            )
-            current = self._solve_agents(self.agents, item, context=context)
+            contexts: list[str] = []
+            deliveries: list[dict[str, Any]] = []
+            for agent_index, agent in enumerate(self.agents):
+                own_previous = current[agent_index]
+                peer_outputs = [
+                    output
+                    for output_index, output in enumerate(current)
+                    if output_index != agent_index
+                ]
+                contexts.append(
+                    f"Debate round {round_index}. Your previous position is:\n"
+                    f"{outputs_to_context([own_previous], rationale_limit=None)}\n"
+                    "The other agents shared these positions with you, including their complete rationales:\n"
+                    f"{outputs_to_context(peer_outputs, rationale_limit=None)}\n"
+                    "Critically compare every peer rationale with your previous reasoning. "
+                    "Return a revised answer and a new rationale that explains which evidence you accepted or rejected. "
+                    "Do not copy peer text verbatim."
+                )
+                deliveries.append(
+                    {
+                        "agent": agent.name,
+                        "received_from": [output.agent for output in peer_outputs],
+                        "peer_rationales": [
+                            {
+                                "agent": output.agent,
+                                "answer": output.answer,
+                                "confidence": output.confidence,
+                                "rationale": output.rationale,
+                            }
+                            for output in peer_outputs
+                        ],
+                    }
+                )
+            current = self._solve_agents(self.agents, item, contexts=contexts)
+            all_outputs.extend(current)
             rounds_used = round_index
             trace.append(
                 {
                     "step": f"debate_round_{round_index}",
+                    "rationale_exchange": deliveries,
                     "outputs": [self._output_dict(item, output, include_role=False) for output in current],
                 }
             )
@@ -179,7 +211,19 @@ class Coordinator:
                 break
 
         final_answer, confidence, agreement, tie = self._majority(item, current)
-        return self._result(item, "debate", final_answer, confidence, agreement, tie, rounds_used, current, trace, started)
+        return self._result(
+            item,
+            "debate",
+            final_answer,
+            confidence,
+            agreement,
+            tie,
+            rounds_used,
+            current,
+            trace,
+            started,
+            usage_outputs=all_outputs,
+        )
 
     def _result(
         self,
@@ -193,9 +237,11 @@ class Coordinator:
         outputs: list[AgentOutput],
         trace: list[dict[str, Any]],
         started: float,
+        usage_outputs: list[AgentOutput] | None = None,
     ) -> CoordinationResult:
-        prompt_tokens = sum(output.prompt_tokens for output in outputs)
-        completion_tokens = sum(output.completion_tokens for output in outputs)
+        metered_outputs = usage_outputs if usage_outputs is not None else outputs
+        prompt_tokens = sum(output.prompt_tokens for output in metered_outputs)
+        completion_tokens = sum(output.completion_tokens for output in metered_outputs)
         evaluation = evaluate_answer(item, final_answer)
         preservation = assess_peer_preservation(item, final_answer)
         output_assessments = [assess_peer_preservation(item, output.answer) for output in outputs]
