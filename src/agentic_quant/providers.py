@@ -14,6 +14,7 @@ from typing import Any, Protocol
 
 from .model_registry import get_model_preset
 from .model_store import model_path, model_status
+from .ollama_client import ollama_chat
 from .tools import estimate_tokens, extract_numbers, format_number
 
 
@@ -223,14 +224,77 @@ class GgufModelProvider:
         return self.llm(f"{system}\n\n{prompt}\n\nJSON:", max_tokens=max_tokens, temperature=temperature)
 
 
+class OllamaModelProvider:
+    name = "ollama"
+
+    def __init__(self, *, model_key: str, seed: int = 0) -> None:
+        self.preset = get_model_preset(model_key)
+        self.model_key = model_key
+        self.ollama_model = self.preset.ollama_model or model_key
+        self.seed = seed
+        self._generation_lock = threading.Lock()
+        status = model_status(model_key)
+        if not status["downloaded"]:
+            detail = f" {status['error']}" if status.get("error") else ""
+            raise RuntimeError(
+                f"The Ollama model {self.ollama_model} is unavailable.{detail} "
+                f"Run `ollama pull {self.ollama_model}` first."
+            )
+        is_cloud = self.ollama_model.endswith("-cloud")
+        self.compute_unit = {
+            "kind": "cloud" if is_cloud else "service",
+            "backend": "Ollama Cloud" if is_cloud else "Ollama",
+            "label": "Cloud (Ollama)" if is_cloud else "Ollama local runtime",
+            "verified": True,
+        }
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        system = (
+            "You are a careful reasoning agent. Follow the scenario and evaluation instructions exactly. "
+            "Return only valid JSON with keys answer, confidence, rationale."
+        )
+        started = time.perf_counter()
+        with self._generation_lock:
+            result = ollama_chat(
+                model=self.ollama_model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                seed=self.seed,
+            )
+        message = result.get("message") or {}
+        text = str(message.get("content") or "").strip()
+        elapsed = time.perf_counter() - started
+        return LLMResponse(
+            text=text,
+            prompt_tokens=_safe_token_count(result.get("prompt_eval_count"), prompt),
+            completion_tokens=_safe_token_count(result.get("eval_count"), text),
+            elapsed_s=elapsed,
+            model=self.model_key,
+        )
+
+
 def make_model_provider(
     *,
     model_key: str = "demo",
     n_ctx: int = 2048,
     seed: int = 0,
 ) -> LLMProvider:
-    if model_key == "demo":
+    preset = get_model_preset(model_key)
+    if preset.backend == "demo":
         return HeuristicProvider(seed=seed)
+    if preset.backend == "ollama":
+        return OllamaModelProvider(model_key=model_key, seed=seed)
     return GgufModelProvider(
         model_key=model_key,
         n_ctx=n_ctx,
@@ -251,6 +315,8 @@ def make_provider(
         return make_model_provider(model_key="demo", seed=seed)
     if provider == "llama-cpp-local":
         return make_model_provider(model_key=model or "qwen2.5-0.5b", seed=seed)
+    if provider == "ollama":
+        return make_model_provider(model_key=model or "gpt-oss:20b", seed=seed)
     if provider == "transformers-local":
         raise ValueError(
             "transformers-local is no longer the recommended path. "

@@ -16,6 +16,8 @@ class ModelPreset:
     expected_bytes: int
     notes: str
     extra_filenames: tuple[str, ...] = ()
+    backend: str = "gguf"
+    ollama_model: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -50,6 +52,33 @@ MODEL_PRESETS = [
         approximate_size="0 GB",
         expected_bytes=0,
         notes="Heuristic baseline for testing the framework, UI, and metrics without downloading weights.",
+        backend="demo",
+    ),
+    ModelPreset(
+        key="gpt-oss:20b",
+        label="GPT-OSS 20B (Ollama local)",
+        family="OpenAI GPT-OSS",
+        parameters="20.9B / 3.6B active",
+        repo_id=None,
+        filename=None,
+        approximate_size="~13 GB",
+        expected_bytes=0,
+        notes="OpenAI open-weight reasoning model served locally by Ollama.",
+        backend="ollama",
+        ollama_model="gpt-oss:20b",
+    ),
+    ModelPreset(
+        key="gpt-oss:20b-cloud",
+        label="GPT-OSS 20B (Ollama Cloud)",
+        family="OpenAI GPT-OSS",
+        parameters="20.9B / 3.6B active",
+        repo_id=None,
+        filename=None,
+        approximate_size="Cloud",
+        expected_bytes=0,
+        notes="OpenAI GPT-OSS 20B served through Ollama Cloud.",
+        backend="ollama",
+        ollama_model="gpt-oss:20b-cloud",
     ),
     ModelPreset(
         key="qwen2.5-0.5b",

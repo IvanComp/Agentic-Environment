@@ -41,6 +41,16 @@ La UI si apre su `http://127.0.0.1:8765` e permette di scegliere modello, agenti
 agentic-quant-ui --no-browser
 ```
 
+Per usare GPT-OSS tramite Ollama, avviare Ollama e preparare uno dei due tag:
+
+```bash
+ollama serve
+ollama pull gpt-oss:20b
+ollama signin && ollama pull gpt-oss:20b-cloud
+```
+
+Entrambi compaiono nella UI e sono selezionabili da CLI con `--model gpt-oss:20b` oppure `--model gpt-oss:20b-cloud`.
+
 ## Eseguire tutti gli esperimenti del paper senza UI
 
 Questo comando esegue tutti e sei i task con i tre meccanismi, ripetendo il protocollo 10 volte con seed da 0 a 9: 180 valutazioni complessive.

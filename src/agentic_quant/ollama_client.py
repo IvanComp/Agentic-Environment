@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Callable
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+
+ProgressCallback = Callable[[int, int], None]
+
+
+def ollama_base_url() -> str:
+    host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").strip()
+    if "://" not in host:
+        host = f"http://{host}"
+    return host.rstrip("/")
+
+
+def ollama_models(*, timeout: float = 3) -> list[dict[str, Any]]:
+    response = _json_request("/api/tags", timeout=timeout)
+    models = response.get("models", [])
+    return models if isinstance(models, list) else []
+
+
+def ollama_model_info(model: str, *, timeout: float = 3) -> dict[str, Any] | None:
+    for item in ollama_models(timeout=timeout):
+        if item.get("model") == model or item.get("name") == model:
+            return item
+    return None
+
+
+def ollama_chat(
+    *,
+    model: str,
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    temperature: float,
+    seed: int,
+    timeout: float = 600,
+) -> dict[str, Any]:
+    return _json_request(
+        "/api/chat",
+        payload={
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "format": "json",
+            "think": "low",
+            "options": {
+                "temperature": temperature,
+                "seed": seed,
+                "num_predict": max_tokens,
+            },
+        },
+        timeout=timeout,
+    )
+
+
+def pull_ollama_model(
+    model: str,
+    *,
+    progress: ProgressCallback | None = None,
+    timeout: float = 600,
+) -> None:
+    request = _request("/api/pull", {"model": model, "stream": True})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            last_done = 0
+            last_total = 0
+            for raw_line in response:
+                if not raw_line.strip():
+                    continue
+                event = json.loads(raw_line)
+                if event.get("error"):
+                    raise RuntimeError(str(event["error"]))
+                done = int(event.get("completed") or last_done)
+                total = int(event.get("total") or last_total)
+                last_done, last_total = done, total
+                if progress and total:
+                    progress(done, total)
+            if progress:
+                final_total = last_total or 1
+                progress(final_total, final_total)
+    except HTTPError as exc:
+        raise _http_error(exc) from exc
+    except URLError as exc:
+        raise _connection_error(exc) from exc
+
+
+def _json_request(
+    path: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    timeout: float,
+) -> dict[str, Any]:
+    request = _request(path, payload)
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            result = json.loads(response.read())
+    except HTTPError as exc:
+        raise _http_error(exc) from exc
+    except URLError as exc:
+        raise _connection_error(exc) from exc
+    if not isinstance(result, dict):
+        raise RuntimeError(f"Ollama returned an invalid response for {path}.")
+    if result.get("error"):
+        raise RuntimeError(str(result["error"]))
+    return result
+
+
+def _request(path: str, payload: dict[str, Any] | None) -> Request:
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    return Request(
+        f"{ollama_base_url()}{path}",
+        data=data,
+        headers={"Content-Type": "application/json", "User-Agent": "agentic-quant/0.2"},
+        method="GET" if payload is None else "POST",
+    )
+
+
+def _http_error(exc: HTTPError) -> RuntimeError:
+    try:
+        body = json.loads(exc.read())
+        detail = body.get("error") if isinstance(body, dict) else None
+    except (json.JSONDecodeError, OSError):
+        detail = None
+    return RuntimeError(detail or f"Ollama returned HTTP {exc.code}.")
+
+
+def _connection_error(exc: URLError) -> RuntimeError:
+    return RuntimeError(
+        f"Ollama is not reachable at {ollama_base_url()}. Start it with `ollama serve`. ({exc.reason})"
+    )

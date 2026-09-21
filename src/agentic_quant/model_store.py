@@ -9,6 +9,7 @@ from typing import Any, Callable
 from urllib.request import Request, urlopen
 
 from .model_registry import get_model_preset
+from .ollama_client import ollama_model_info, pull_ollama_model
 from .paths import workspace_root
 
 
@@ -43,6 +44,8 @@ def model_status(model_key: str) -> dict[str, Any]:
             "bytes_total": 0,
             "percent": 100,
         }
+    if getattr(preset, "backend", "gguf") == "ollama":
+        return _ollama_model_status(model_key)
 
     paths = model_file_paths(model_key)
     file_statuses = []
@@ -96,6 +99,11 @@ def ensure_models(model_keys: list[str], *, download: bool, progress: Callable[[
     missing = missing_model_keys(model_keys)
     if missing and not download:
         labels = ", ".join(get_model_preset(key).label for key in missing)
+        if any(getattr(get_model_preset(key), "backend", "gguf") == "ollama" for key in missing):
+            raise RuntimeError(
+                f"Ollama models unavailable: {labels}. Start Ollama, then use --download-model "
+                "or pull the requested tags with `ollama pull`."
+            )
         raise RuntimeError(
             "Models not downloaded: "
             f"{labels}. Download them from the UI or rerun with --download-model."
@@ -112,6 +120,9 @@ def download_model(model_key: str, *, progress: ProgressCallback | None = None) 
 def _download_model_locked(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
     preset = get_model_preset(model_key)
     if model_key == "demo":
+        return model_path(model_key)
+    if getattr(preset, "backend", "gguf") == "ollama":
+        pull_ollama_model(preset.ollama_model or model_key, progress=progress)
         return model_path(model_key)
     if not preset.download_urls:
         raise ValueError(f"Model {model_key} does not define a download URL.")
@@ -184,6 +195,40 @@ def _download_model_locked(model_key: str, *, progress: ProgressCallback | None 
     if progress:
         progress(actual_size, expected_total or actual_size)
     return final_paths[0]
+
+
+def _ollama_model_status(model_key: str) -> dict[str, Any]:
+    preset = get_model_preset(model_key)
+    ollama_model = preset.ollama_model or model_key
+    error = ""
+    try:
+        info = ollama_model_info(ollama_model)
+    except RuntimeError as exc:
+        info = None
+        error = str(exc)
+    size = int((info or {}).get("size") or 0)
+    downloaded = info is not None
+    path = f"ollama://{ollama_model}"
+    return {
+        **preset.to_dict(),
+        "downloaded": downloaded,
+        "available": downloaded,
+        "path": path,
+        "file_count": 1 if downloaded else 0,
+        "files": [
+            {
+                "filename": ollama_model,
+                "path": path,
+                "exists": downloaded,
+                "bytes": size,
+                "partial_bytes": 0,
+            }
+        ],
+        "bytes_downloaded": size,
+        "bytes_total": size,
+        "percent": 100 if downloaded else 0,
+        "error": error,
+    }
 
 
 def _content_length(response) -> int:

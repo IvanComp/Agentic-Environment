@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from agentic_quant.providers import GgufModelProvider
+from agentic_quant.providers import GgufModelProvider, OllamaModelProvider, make_model_provider
 from agentic_quant.web_ui import INDEX_HTML
 
 
@@ -103,6 +103,43 @@ class GgufModelProviderTest(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "agentic-quant-install-cuda"):
                 provider._load_llm()
+
+
+class OllamaModelProviderTest(unittest.TestCase):
+    def test_factory_selects_ollama_backend(self) -> None:
+        with (
+            patch("agentic_quant.providers.model_status", return_value={"downloaded": True}),
+            patch("agentic_quant.providers.ollama_chat"),
+        ):
+            provider = make_model_provider(model_key="gpt-oss:20b", seed=7)
+
+        self.assertIsInstance(provider, OllamaModelProvider)
+        self.assertEqual(provider.ollama_model, "gpt-oss:20b")
+        self.assertEqual(provider.compute_unit["label"], "Ollama local runtime")
+
+    def test_cloud_generation_uses_json_chat_and_reports_usage(self) -> None:
+        response = {
+            "message": {"role": "assistant", "content": '{"answer":"ok","confidence":0.9,"rationale":"checked"}'},
+            "prompt_eval_count": 21,
+            "eval_count": 9,
+        }
+        with (
+            patch("agentic_quant.providers.model_status", return_value={"downloaded": True}),
+            patch("agentic_quant.providers.ollama_chat", return_value=response) as chat,
+        ):
+            provider = OllamaModelProvider(model_key="gpt-oss:20b-cloud", seed=4)
+            result = provider.generate("test prompt", max_tokens=80, temperature=0.2)
+
+        self.assertEqual(result.model, "gpt-oss:20b-cloud")
+        self.assertEqual(result.prompt_tokens, 21)
+        self.assertEqual(result.completion_tokens, 9)
+        self.assertEqual(provider.compute_unit["kind"], "cloud")
+        chat.assert_called_once()
+        call = chat.call_args.kwargs
+        self.assertEqual(call["model"], "gpt-oss:20b-cloud")
+        self.assertEqual(call["seed"], 4)
+        self.assertEqual(call["max_tokens"], 80)
+        self.assertEqual(call["temperature"], 0.2)
 
 
 if __name__ == "__main__":
