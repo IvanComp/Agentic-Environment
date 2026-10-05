@@ -1,0 +1,19 @@
+# One exact command-line argument per non-comment line.
+# Change this file as the experimental protocol evolves; the Slurm scripts do
+# not need to change.
+--ctx
+8192
+--temperature
+0.2
+--max-tokens
+1024
+--agents
+3
+--debate-rounds
+2
+--voting-tie-breaker
+confidence
+--mechanisms
+voting
+role
+debate

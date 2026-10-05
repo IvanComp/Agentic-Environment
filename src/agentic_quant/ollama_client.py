@@ -39,20 +39,22 @@ def ollama_chat(
     seed: int,
     timeout: float = 600,
 ) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "format": "json",
+        "options": {
+            "temperature": temperature,
+            "seed": seed,
+            "num_predict": max_tokens,
+        },
+    }
+    if model.startswith("gpt-oss:"):
+        payload["think"] = "low"
     return _json_request(
         "/api/chat",
-        payload={
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "format": "json",
-            "think": "low",
-            "options": {
-                "temperature": temperature,
-                "seed": seed,
-                "num_predict": max_tokens,
-            },
-        },
+        payload=payload,
         timeout=timeout,
     )
 
@@ -88,6 +90,17 @@ def pull_ollama_model(
         raise _connection_error(exc) from exc
 
 
+def delete_ollama_model(model: str, *, timeout: float = 600) -> None:
+    request = _request("/api/delete", {"model": model}, method="DELETE")
+    try:
+        with urlopen(request, timeout=timeout):
+            return
+    except HTTPError as exc:
+        raise _http_error(exc) from exc
+    except URLError as exc:
+        raise _connection_error(exc) from exc
+
+
 def _json_request(
     path: str,
     *,
@@ -109,13 +122,13 @@ def _json_request(
     return result
 
 
-def _request(path: str, payload: dict[str, Any] | None) -> Request:
+def _request(path: str, payload: dict[str, Any] | None, *, method: str | None = None) -> Request:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     return Request(
         f"{ollama_base_url()}{path}",
         data=data,
         headers={"Content-Type": "application/json", "User-Agent": "agentic-quant/0.2"},
-        method="GET" if payload is None else "POST",
+        method=method or ("GET" if payload is None else "POST"),
     )
 
 

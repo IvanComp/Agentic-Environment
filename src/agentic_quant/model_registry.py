@@ -81,6 +81,22 @@ MODEL_PRESETS = [
         ollama_model="gpt-oss:20b-cloud",
     ),
     ModelPreset(
+        key="spark-x2.5-4b",
+        label="Spark X2.5 4B (Ollama)",
+        family="Spark X2.5",
+        parameters="4B",
+        repo_id=None,
+        filename=None,
+        approximate_size="~8.2 GB",
+        expected_bytes=0,
+        notes=(
+            "Official SparkLLM model served locally by Ollama; requires Ollama 0.34.1 "
+            "or later for the spark2_5 architecture."
+        ),
+        backend="ollama",
+        ollama_model="SparkLLM/Spark-X2.5-4B:latest",
+    ),
+    ModelPreset(
         key="qwen2.5-0.5b",
         label="Qwen 2.5 0.5B",
         family="Qwen",

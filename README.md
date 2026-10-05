@@ -51,6 +51,15 @@ ollama signin && ollama pull gpt-oss:20b-cloud
 
 Entrambi compaiono nella UI e sono selezionabili da CLI con `--model gpt-oss:20b` oppure `--model gpt-oss:20b-cloud`.
 
+Spark X2.5 4B è disponibile tramite il tag Ollama ufficiale di SparkLLM. Il modello richiede Ollama 0.34.1 o successivo per il supporto dell'architettura `spark2_5`:
+
+```bash
+ollama pull SparkLLM/Spark-X2.5-4B:latest
+agentic-quant --model spark-x2.5-4b
+```
+
+In alternativa, selezionare `Spark X2.5 4B (Ollama)` nella UI e usare il pulsante di download. Il modello viene eseguito localmente tramite Ollama.
+
 ## Eseguire tutti gli esperimenti del paper senza UI
 
 Questo comando esegue tutti e sei i task con i tre meccanismi, ripetendo il protocollo 10 volte con seed da 0 a 9: 180 valutazioni complessive.

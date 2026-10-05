@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from agentic_quant.model_store import _download_model_locked
+from agentic_quant.model_store import _download_model_locked, delete_model
 
 
 class FakeResponse:
@@ -61,6 +61,28 @@ class ModelStoreTest(unittest.TestCase):
             self.assertFalse(part_path.exists())
             self.assertEqual(observed_range, ["bytes=3-"])
             self.assertEqual(progress[-1], (6, 6))
+
+    def test_delete_model_removes_only_files_declared_by_the_preset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            model_dir = root / "selected"
+            model_dir.mkdir()
+            selected = model_dir / "selected.gguf"
+            selected.write_bytes(b"weights")
+            unrelated = root / "unrelated.gguf"
+            unrelated.write_bytes(b"keep")
+            preset = SimpleNamespace(backend="gguf")
+
+            with (
+                patch("agentic_quant.model_store.MODELS_DIR", root),
+                patch("agentic_quant.model_store.get_model_preset", return_value=preset),
+                patch("agentic_quant.model_store.model_file_paths", return_value=[selected]),
+            ):
+                removed = delete_model("selected")
+
+            self.assertEqual(removed, [str(selected.resolve())])
+            self.assertFalse(selected.exists())
+            self.assertTrue(unrelated.exists())
 
 
 if __name__ == "__main__":

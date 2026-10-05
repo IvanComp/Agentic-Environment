@@ -14,6 +14,12 @@ class OllamaIntegrationTest(unittest.TestCase):
             self.assertEqual(preset.backend, "ollama")
             self.assertEqual(preset.ollama_model, key)
 
+    def test_spark_x25_uses_official_ollama_tag(self) -> None:
+        preset = get_model_preset("spark-x2.5-4b")
+
+        self.assertEqual(preset.backend, "ollama")
+        self.assertEqual(preset.ollama_model, "SparkLLM/Spark-X2.5-4B:latest")
+
     def test_model_status_reads_ollama_inventory(self) -> None:
         with patch(
             "agentic_quant.model_store.ollama_model_info",
@@ -32,6 +38,17 @@ class OllamaIntegrationTest(unittest.TestCase):
 
         pull.assert_called_once_with("gpt-oss:20b-cloud", progress=progress)
         self.assertEqual(result.name, "gpt-oss:20b-cloud")
+
+    def test_spark_download_delegates_to_official_ollama_pull(self) -> None:
+        progress = lambda _done, _total: None
+        with patch("agentic_quant.model_store.pull_ollama_model") as pull:
+            result = download_model("spark-x2.5-4b", progress=progress)
+
+        pull.assert_called_once_with(
+            "SparkLLM/Spark-X2.5-4B:latest",
+            progress=progress,
+        )
+        self.assertEqual(result.name, "spark-x2.5-4b")
 
 
 if __name__ == "__main__":

@@ -9,12 +9,12 @@ from typing import Any, Callable
 from urllib.request import Request, urlopen
 
 from .model_registry import get_model_preset
-from .ollama_client import ollama_model_info, pull_ollama_model
+from .ollama_client import delete_ollama_model, ollama_model_info, pull_ollama_model
 from .paths import workspace_root
 
 
 PROJECT_ROOT = workspace_root()
-MODELS_DIR = PROJECT_ROOT / "models"
+MODELS_DIR = Path(os.environ.get("AGENTIC_QUANT_MODELS_DIR", PROJECT_ROOT / "models")).expanduser().resolve()
 
 ProgressCallback = Callable[[int, int], None]
 _MODEL_LOCKS: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -115,6 +115,38 @@ def ensure_models(model_keys: list[str], *, download: bool, progress: Callable[[
 def download_model(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
     with _MODEL_LOCKS[model_key]:
         return _download_model_locked(model_key, progress=progress)
+
+
+def delete_model(model_key: str) -> list[str]:
+    """Delete only the files owned by one model preset.
+
+    Campaign scripts provide the inter-process lock. This function deliberately
+    resolves and validates every local path before unlinking it so a malformed
+    preset cannot broaden the deletion scope.
+    """
+    preset = get_model_preset(model_key)
+    if model_key == "demo":
+        return []
+    if getattr(preset, "backend", "gguf") == "ollama":
+        delete_ollama_model(preset.ollama_model or model_key)
+        return [f"ollama://{preset.ollama_model or model_key}"]
+
+    model_root = MODELS_DIR.resolve()
+    removed: list[str] = []
+    parents: set[Path] = set()
+    for path in model_file_paths(model_key):
+        resolved = path.resolve()
+        if not resolved.is_relative_to(model_root):
+            raise RuntimeError(f"Refusing to delete model path outside {model_root}: {resolved}")
+        for candidate in (resolved, resolved.with_suffix(resolved.suffix + ".part")):
+            if candidate.is_file():
+                candidate.unlink()
+                removed.append(str(candidate))
+        parents.add(resolved.parent)
+    for parent in sorted(parents, key=lambda item: len(item.parts), reverse=True):
+        if parent != model_root and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+    return removed
 
 
 def _download_model_locked(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
