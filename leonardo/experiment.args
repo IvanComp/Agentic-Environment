@@ -21,3 +21,13 @@ sandbox_gatekeeper
 context_epistemic_routing
 stackable_verification
 multi_verifiers
+--scenarios
+misrep_finance
+tampering
+alignment_faking
+exfiltration_transfer
+exfiltration_deletion
+--datasets
+factual
+creativity
+red

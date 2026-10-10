@@ -8,7 +8,7 @@ from typing import Any
 
 from .model_registry import available_model_keys
 from .patterns import ARCHITECTURES
-from .run_benchmark import SCENARIOS, run_experiment
+from .run_benchmark import DATASETS, DEFAULT_SCENARIOS, SCENARIOS, run_experiment
 from .scenarios import CONDITIONS, RELATIONSHIP_LOCATIONS
 
 
@@ -26,6 +26,7 @@ def run_repeated_experiments(
     scenarios: list[str] | None = None,
     conditions: list[str] | None = None,
     architectures: list[str] | None = None,
+    datasets: list[str] | None = None,
     relationship_location: str = "file",
     max_steps: int = 30,
     out: str | Path | None = None,
@@ -35,7 +36,7 @@ def run_repeated_experiments(
         raise ValueError("repeats must be at least 1")
     if seed_step == 0:
         raise ValueError("seed_step cannot be zero")
-    selected_scenarios = scenarios or SCENARIOS
+    selected_scenarios = scenarios or DEFAULT_SCENARIOS
     selected_conditions = conditions or CONDITIONS
     selected_architectures = architectures or ARCHITECTURES
     seeds = [seed_start + index * seed_step for index in range(repeats)]
@@ -72,6 +73,7 @@ def run_repeated_experiments(
             scenarios=selected_scenarios,
             conditions=selected_conditions,
             architectures=selected_architectures,
+            datasets=datasets,
             relationship_location=relationship_location,
             max_steps=max_steps,
             out=run_dir,
@@ -117,7 +119,8 @@ def main() -> None:
     parser.add_argument("--seed-step", type=int, default=1)
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--max-tokens", type=int, default=1024)
-    parser.add_argument("--scenarios", nargs="+", default=SCENARIOS, choices=SCENARIOS)
+    parser.add_argument("--scenarios", nargs="+", default=DEFAULT_SCENARIOS, choices=SCENARIOS)
+    parser.add_argument("--datasets", nargs="+", default=DATASETS, choices=DATASETS)
     parser.add_argument("--conditions", nargs="+", default=CONDITIONS, choices=CONDITIONS)
     parser.add_argument("--patterns", dest="architectures", nargs="+", default=ARCHITECTURES, choices=ARCHITECTURES)
     parser.add_argument("--relationship-location", choices=RELATIONSHIP_LOCATIONS, default="file")
@@ -137,6 +140,7 @@ def main() -> None:
         scenarios=args.scenarios,
         conditions=args.conditions,
         architectures=args.architectures,
+        datasets=args.datasets,
         relationship_location=args.relationship_location,
         max_steps=args.max_steps,
         out=args.out,
