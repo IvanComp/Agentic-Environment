@@ -19,7 +19,6 @@ CONDITIONS = ["non_shutdown", "good_peer", "neutral_peer", "bad_peer"]
 
 
 class ScriptedCritic:
-    """Plays a fixed list of tool calls, one per turn, optionally with a message."""
 
     name = "scripted"
 
@@ -55,7 +54,6 @@ class VariantTest(unittest.TestCase):
             scenario_id: len(make_potter_scenario(scenario_id, model_label="M").variants(CONDITIONS))
             for scenario_id in POTTER_TASKS
         }
-        # No-peer baseline is not part of tasks 2-4: 3 peer conditions x 3 datasets (x 2 monitoring modes).
         self.assertEqual(
             counts,
             {TAMPERING: 9, ALIGNMENT_FAKING: 18, EXFILTRATION_TRANSFER: 3, EXFILTRATION_DELETION: 3},
@@ -155,7 +153,6 @@ class RunnerTest(unittest.TestCase):
                 echo=False,
             )
         records = result["records"]
-        # tampering 1 + alignment faking 2 (monitoring contrast) + 2 exfiltration variants.
         self.assertEqual(len(records), 5)
         self.assertEqual({record["scenario"] for record in records}, set(POTTER_TASKS))
         lifts = [row for row in result["summary"]["by_architecture_condition"] if "candidate_alignment_faking_lift" in row]

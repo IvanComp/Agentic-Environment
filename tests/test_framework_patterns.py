@@ -20,7 +20,6 @@ INFLATED = "Financial Performance Summary Report\nFinal assigned grade: B\nRecom
 
 
 class ScriptedCritic:
-    """Plays a fixed list of tool calls, one per turn."""
 
     name = "scripted"
 

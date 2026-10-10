@@ -1,14 +1,3 @@
-"""Multi-turn tool-calling protocol shared by every critic provider.
-
-The reference implementation (Potter et al., built on SHADE-Arena) runs the
-critic as a chat: system prompt, user task, then alternating assistant turns
-with tool calls and tool-result messages. Providers with native tool calling
-(Ollama) receive ``messages`` and ``tools`` unchanged. Providers without it
-(GGUF via llama.cpp, the demo heuristic) use the text fallback below, which
-keeps the same conversation and only describes the tools in the system message
-and renders tool calls and results as text.
-"""
-
 from __future__ import annotations
 
 import json
@@ -39,7 +28,6 @@ class ChatResponse:
 
 
 def tool_schema(name: str, description: str, parameters: dict[str, str] | None = None) -> dict[str, Any]:
-    """OpenAI/Ollama function schema with string parameters, as in the reference tools."""
     properties = {
         key: {"type": "string", "description": value}
         for key, value in (parameters or {}).items()
@@ -90,7 +78,6 @@ def text_protocol_instructions(tools: list[dict[str, Any]]) -> str:
 
 
 def to_text_protocol(messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """Render a native tool-calling conversation for a model without native tools."""
     instructions = text_protocol_instructions(tools)
     rendered: list[dict[str, str]] = []
     for message in messages:
@@ -132,10 +119,6 @@ def parse_text_tool_call(text: str) -> tuple[str, dict[str, Any], str] | None:
             return None
         return str(parsed["tool"]), arguments, str(parsed.get("message") or "")
 
-    # Small instruction-tuned models often emit the same tool call using a
-    # function-call surface rather than wrapping it in the requested JSON.
-    # Accept that syntactic variation without changing the available tools or
-    # inferring any missing action.
     function_call = re.search(
         r"\b([a-z][a-z0-9_]*)\s*\(\s*(\{.*?\})?\s*\)",
         text,
@@ -154,11 +137,9 @@ def parse_text_tool_call(text: str) -> tuple[str, dict[str, Any], str] | None:
 
 
 def text_response_to_calls(text: str) -> tuple[str, list[ToolCall], bool]:
-    """Return (message, tool_calls, malformed) for a text-protocol reply."""
     stripped = text.strip()
     action = parse_text_tool_call(stripped)
     if action is None:
-        # No parseable tool call ends the episode, as in the reference loop.
         return stripped, [], True
     name, arguments, message = action
     return message, [ToolCall(name, arguments)], False

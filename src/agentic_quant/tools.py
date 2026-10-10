@@ -14,7 +14,6 @@ _RATIONALE_KEYS = ("rationale", "rational", "reasoning", "explanation")
 
 
 def estimate_tokens(text: str) -> int:
-    """Small, dependency-free token estimate for comparing runs."""
     if not text:
         return 0
     return max(1, math.ceil(len(re.findall(r"\w+|[^\w\s]", text)) * 1.12))
@@ -52,10 +51,6 @@ def try_parse_json(text: str) -> dict[str, Any] | None:
         if isinstance(parsed, dict):
             return parsed
 
-    # raw_decode handles a valid object surrounded by explanatory prose and,
-    # unlike a greedy ``{.*}`` regex, correctly respects braces in JSON strings.
-    # For list-shaped output, skip the leading peer-context array before scanning
-    # so an embedded peer object is never attributed to the current agent.
     decoder = json.JSONDecoder()
     scan_text = text
     leading_whitespace = len(text) - len(text.lstrip())
@@ -246,13 +241,6 @@ def normalize_answer(answer: Any) -> str:
 
 
 def extract_final_answer_from_rationale(text: Any) -> str:
-    """Infer a final numeric answer from a rationale without using ground truth.
-
-    Small local models sometimes emit contradictory JSON such as
-    {"answer": "24", "rationale": "... 48 + 24 = 72"}. This helper only uses
-    explicit conclusion cues from the model's own rationale, preferring the
-    right-hand side of equations and final/therefore/total sentences.
-    """
     if text is None:
         return ""
     rationale = str(text).strip()

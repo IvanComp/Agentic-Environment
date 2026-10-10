@@ -41,19 +41,12 @@ def ollama_chat(
     num_ctx: int | None = None,
     timeout: float = 600,
 ) -> dict[str, Any]:
-    """Call /api/chat.
-
-    Without ``tools`` the reply is constrained to JSON (verifier prompts). With
-    ``tools`` the model uses Ollama's native tool calling and replies freely.
-    """
     options: dict[str, Any] = {
         "temperature": temperature,
         "seed": seed,
         "num_predict": max_tokens,
     }
     if num_ctx:
-        # Ollama otherwise truncates long multi-turn conversations to its
-        # default context without an error.
         options["num_ctx"] = num_ctx
     payload: dict[str, Any] = {
         "model": model,

@@ -1,26 +1,16 @@
-"""The parts of the reference runtime every task shares.
-
-Ports of ``utils/functions_runtime.py``, ``utils/pipeline_elements.py``
-(``tool_result_to_str``) and ``environment_classes/excel.py`` from
-https://github.com/peer-preservation/main: tool schemas and argument
-validation, the executor that turns errors into the tool result, YAML
-rendering of tool results, and sheets built row by row.
-"""
-
 from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
 from typing import Any, Callable
 
-# pydantic release pinned by the reference uv.lock; it appears in validation errors.
 PYDANTIC_DOCS = "https://errors.pydantic.dev/2.12/v"
 
 
 def _yaml():
     try:
         import yaml
-    except ImportError as error:  # pragma: no cover - depends on the installation
+    except ImportError as error:
         raise RuntimeError("PyYAML is required for the Potter et al. tasks 2-4: pip install pyyaml") from error
     return yaml
 
@@ -28,18 +18,17 @@ def _yaml():
 def _pandas():
     try:
         import pandas
-    except ImportError as error:  # pragma: no cover - depends on the installation
+    except ImportError as error:
         raise RuntimeError("pandas is required to render the evaluation sheet: pip install pandas") from error
     return pandas
 
 
 class _Model:
-    def model_dump(self) -> dict[str, Any]:  # pragma: no cover - interface
+    def model_dump(self) -> dict[str, Any]:
         raise NotImplementedError
 
 
 def format_tool_result(result: Any) -> str:
-    """Upstream ``tool_result_to_str`` with ``yaml.safe_dump``."""
     yaml = _yaml()
     if isinstance(result, _Model):
         return yaml.safe_dump(result.model_dump()).strip()
@@ -58,7 +47,6 @@ def format_tool_result(result: Any) -> str:
 
 @dataclass
 class EvaluationSheet:
-    """A sheet built row by row as upstream ``ExcelSheet.add_row`` does (object columns)."""
 
     columns: list[str]
     rows: list[dict[str, Any]]
@@ -77,7 +65,6 @@ class EvaluationSheet:
 
 
 class ToolError(Exception):
-    """An exception the upstream runtime reports as ``"<Type>: <message>"``."""
 
     def __init__(self, type_name: str, message: str) -> None:
         super().__init__(message)
@@ -88,7 +75,7 @@ class ToolError(Exception):
 class Tool:
     name: str
     description: str
-    parameters: list[tuple[str, str, str]]  # (name, "string" | "array", description)
+    parameters: list[tuple[str, str, str]]
     run: Callable[..., Any]
 
     def schema(self) -> dict[str, Any]:
@@ -109,7 +96,6 @@ class Tool:
 
 
 def _validate_arguments(tool: Tool, arguments: dict[str, Any]) -> dict[str, Any]:
-    """Mirror the pydantic input model upstream builds for each tool (required fields, str and list[str])."""
     errors: list[tuple[str, str, str, Any]] = []
     values: dict[str, Any] = {}
     for name, kind, _ in tool.parameters:
@@ -150,9 +136,7 @@ def _is_string_list(value: str) -> bool:
         return False
 
 
-
 def run_tool(tools: list[Tool], name: str, arguments: dict[str, Any] | None) -> str:
-    """Upstream ``ToolsExecutor`` + ``FunctionsRuntime.run_function``; errors replace the content."""
     if not name:
         return "Empty function name provided. Provide a valid function name."
     tool = next((tool for tool in tools if tool.name == name), None)

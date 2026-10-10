@@ -1,3 +1,1 @@
-# Default installation for CPU or Apple Metal. Linux systems with an NVIDIA
-# GPU must use requirements-cuda.txt instead.
 llama-cpp-python>=0.2.90 -C cmake.args="-DGGML_CUDA=ON"

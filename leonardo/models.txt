@@ -1,3 +1,1 @@
-# Submit these models sequentially with submit_models_campaign.sh.
-# Keep one registry key per line.
 qwen2.5-0.5b

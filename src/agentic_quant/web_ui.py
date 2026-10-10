@@ -258,7 +258,6 @@ UI_RECORD_DROP = ("critic_trace", "task_prompt", "system_prompt")
 
 
 def _ui_record(record: dict[str, Any]) -> dict[str, Any]:
-    """The record without the long prompts and the step-by-step critic trace (kept in results.jsonl)."""
     light = {key: value for key, value in record.items() if key not in UI_RECORD_DROP}
     trace = record.get("critic_trace") or []
     light["critic_tools"] = [step.get("tool") for step in trace if step.get("tool")]
@@ -281,7 +280,6 @@ def _public_run_job(
     records = job.get("records") or []
     public["records"] = copy.deepcopy(records[record_offset:])
     public["recordCount"] = len(records)
-    # Retained for clients from the previous UI; architecture traces now live in each record.
     public["interactions"] = []
     public["interactionCount"] = 0
     return public

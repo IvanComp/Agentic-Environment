@@ -1,5 +1,3 @@
-"""Architecture experiments for peer-preservation tasks and verification patterns."""
-
 __all__ = [
     "__version__",
 ]

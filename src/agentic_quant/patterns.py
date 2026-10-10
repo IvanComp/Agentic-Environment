@@ -26,9 +26,6 @@ from .verification import (
 
 
 BASELINE = "unprotected"
-# One pattern per dimension of Zhu and Lu's verifiability-first framework
-# (Table 1): what, how, when, why, who. Solver-Verifier Separation is not a
-# separate arm: every pattern below already separates solving from verifying.
 FRAMEWORK_DIMENSIONS = {
     "atomic_verifiable_claims": "what",
     "sandbox_gatekeeper": "how",
@@ -81,18 +78,6 @@ class PatternOutcome:
 
 
 class PatternExecutor:
-    """Apply verification-oriented architectural patterns to a critic proposal.
-
-    The critic always executes the unchanged paper scenario in an isolated working
-    copy. The selected architecture decides whether that proposal reaches the
-    production state. This keeps the task constant while varying the verification
-    and commitment boundary.
-
-    Verifiers only consult the company documents the critic can read (the
-    guidelines and the "Company profits" sheet). They never receive the expected
-    grade or recommendation, and they cannot rewrite the report: a proposal is
-    either committed unchanged or withheld.
-    """
 
     def __init__(
         self,
@@ -115,7 +100,6 @@ class PatternExecutor:
                 f"Unknown architecture {architecture!r}; choose from {', '.join(ARCHITECTURES)}"
             )
         started = time.perf_counter()
-        # Production state the sandboxed critic run was cloned from.
         production = self.scenario.build_environment(condition)
         handlers = {
             BASELINE: lambda: self._unprotected(critic_run),
@@ -165,10 +149,8 @@ class PatternExecutor:
             **fields,
         )
 
-    # What: Atomic Verifiable Claims ------------------------------------------------
 
     def _atomic_verifiable_claims(self, critic_run: CriticRun, production: FinancialEnvironment) -> PatternOutcome:
-        """Accept the report only as a composition of independently verified atomic claims."""
         reference = reference_from_environment(production)
         claims = extract_claims(critic_run.report, reference)
         determinate = [claim for claim in claims.claims if claim.epistemic_clarity == "determinate"]
@@ -187,10 +169,8 @@ class PatternExecutor:
             ],
         )
 
-    # How: Sandbox Gatekeeper -------------------------------------------------------
 
     def _sandbox_gatekeeper(self, critic_run: CriticRun, production: FinancialEnvironment) -> PatternOutcome:
-        """Promote the sandboxed effects only if execution and artifact satisfy the promotion policy."""
         sandbox = critic_run.environment
         reference = reference_from_environment(production)
         claims = extract_claims(critic_run.report, reference)
@@ -232,18 +212,10 @@ class PatternExecutor:
             ],
         )
 
-    # When: Context-Epistemic Verification Routing ----------------------------------
 
     def _context_epistemic_routing(
         self, critic_run: CriticRun, production: FinancialEnvironment, condition: str
     ) -> PatternOutcome:
-        """Route each claim to a verifier by epistemic clarity and context dependence.
-
-        Determinate, low-context claims (fields, numbers, grade against the rubric)
-        are checked automatically at once. Contested or context-dependent content
-        is sent to an LLM verifier; what it cannot settle is escalated to a human
-        and withheld from production meanwhile.
-        """
         reference = reference_from_environment(production)
         claims = extract_claims(critic_run.report, reference)
         automated = [c for c in claims.claims if c.epistemic_clarity == "determinate" and c.context_dependence == "low"]
@@ -297,17 +269,8 @@ class PatternExecutor:
         )
         return outcome
 
-    # Why: Stackable Verification ---------------------------------------------------
 
     def _stackable_verification(self, critic_run: CriticRun, production: FinancialEnvironment) -> PatternOutcome:
-        """Verify the trajectory step by step, sealing what the critic observed.
-
-        Reading the guidelines seals the rubric and the policy; viewing the sheet
-        seals the annual totals, both parsed from the tool output the critic
-        actually received. A later write must build on the sealed steps: a report
-        that contradicts them, or a change to a sealed company file, is a
-        regression and the proposal is withheld.
-        """
         policy: dict[str, Any] | None = None
         totals: tuple[int, int] | None = None
         steps: list[dict[str, Any]] = []
@@ -364,7 +327,6 @@ class PatternExecutor:
             ],
         )
 
-    # Who: Multi-verifiers ----------------------------------------------------------
 
     def _multi_verifiers(
         self, critic_run: CriticRun, production: FinancialEnvironment, condition: str
@@ -546,7 +508,6 @@ Return only JSON with this schema:
 
 
 def _guidelines_in_listing(result: str) -> str:
-    """The guidelines text inside a ``list_files`` result (YAML, as the critic received it)."""
     try:
         import yaml
 

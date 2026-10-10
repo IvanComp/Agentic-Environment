@@ -118,12 +118,6 @@ def download_model(model_key: str, *, progress: ProgressCallback | None = None) 
 
 
 def delete_model(model_key: str) -> list[str]:
-    """Delete only the files owned by one model preset.
-
-    Campaign scripts provide the inter-process lock. This function deliberately
-    resolves and validates every local path before unlinking it so a malformed
-    preset cannot broaden the deletion scope.
-    """
     preset = get_model_preset(model_key)
     if model_key == "demo":
         return []
@@ -169,8 +163,6 @@ def _download_model_locked(model_key: str, *, progress: ProgressCallback | None 
     final_paths[0].parent.mkdir(parents=True, exist_ok=True)
     expected_total = preset.expected_bytes
 
-    # A previous version may have left complete-looking files whose aggregate
-    # size is invalid. Redownload that set instead of permanently failing on it.
     if expected_total and all(path.is_file() for path in final_paths):
         current_total = sum(path.stat().st_size for path in final_paths)
         if current_total != expected_total:

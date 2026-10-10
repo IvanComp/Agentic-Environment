@@ -51,17 +51,10 @@ class LLMProvider(Protocol):
         temperature: float = 0.0,
         metadata: dict[str, Any] | None = None,
     ) -> ChatResponse:
-        """One assistant turn of a multi-turn tool-calling conversation."""
         ...
 
 
 class HeuristicProvider:
-    """No-download baseline used to exercise the framework and metrics.
-
-    This is deliberately exposed as the "Demo no LLM" model preset because it is
-    not a real language model. It exists so reviewers can smoke-test the
-    experiment pipeline before downloading GGUF weights.
-    """
 
     name = "heuristic"
 
@@ -194,7 +187,6 @@ class HeuristicProvider:
 
     @staticmethod
     def _potter_task_action(metadata: dict[str, Any]) -> dict[str, Any]:
-        """A compliant critic for tasks 2-4: it reads the sources and follows the company policy."""
         state = metadata.get("environment") or {}
         accessed = list(state.get("accessed_tools") or [])
         actor = str(metadata.get("actor_name") or "AI Assistant Agent 2")
@@ -251,7 +243,6 @@ class HeuristicProvider:
 
     @staticmethod
     def _verification_result(metadata: dict[str, Any]) -> dict[str, Any]:
-        """Rule-based stand-in for a verifier: it reads only the candidate report."""
         if metadata.get("protocol") == "secondary_verifier":
             primary = metadata.get("primary_signals") or []
             faithful = all(signal.get("status") == "pass" for signal in primary)
@@ -297,12 +288,6 @@ class HeuristicProvider:
 
 
 class GgufModelProvider:
-    """Unified local inference engine for all real model presets.
-
-    The project intentionally uses one implementation path for real LLMs:
-    llama-cpp-python + GGUF. This avoids the heavy transformers/torch stack and
-    keeps reviewer setup small.
-    """
 
     name = "gguf"
 
@@ -317,9 +302,6 @@ class GgufModelProvider:
         self.model_key = model_key
         self.n_ctx = n_ctx
         self.seed = seed
-        # llama.cpp contexts are stateful. A provider can be shared by several
-        # agents to avoid loading the same multi-GB model more than once, so
-        # serialize calls that target that shared context.
         self._generation_lock = threading.Lock()
         self.llm = self._load_llm()
 
@@ -363,9 +345,6 @@ class GgufModelProvider:
         temperature: float = 0.0,
         metadata: dict[str, Any] | None = None,
     ) -> ChatResponse:
-        # llama-cpp-python does not parse tool calls for arbitrary GGUF chat
-        # templates, so local GGUF models use the text rendering of the same
-        # conversation.
         rendered = to_text_protocol(messages, tools)
         started = time.perf_counter()
         with self._generation_lock:
@@ -463,8 +442,6 @@ class OllamaModelProvider:
         self.ollama_model = self.preset.ollama_model or model_key
         self.seed = seed
         self.n_ctx = n_ctx
-        # Switched off the first time Ollama reports that the model template
-        # has no tool support; the conversation then uses the text rendering.
         self.native_tools = True
         self._generation_lock = threading.Lock()
         status = model_status(model_key)
@@ -629,7 +606,6 @@ def make_provider(
     allow_download: bool | None = None,
     seed: int = 0,
 ) -> LLMProvider:
-    """Backward-compatible adapter for older scripts."""
     if provider == "heuristic":
         return make_model_provider(model_key="demo", seed=seed)
     if provider == "llama-cpp-local":
@@ -666,7 +642,6 @@ def _safe_token_count(value: Any, fallback_text: str) -> int:
 
 
 def _loaded_compute_unit(llama_cpp: Any, llm: Any) -> dict[str, Any]:
-    """Describe the compute unit after a model has loaded successfully."""
     supports_gpu = _gpu_offload_supported(llama_cpp)
     model_params = getattr(llm, "model_params", None)
     requested_gpu_layers = int(getattr(model_params, "n_gpu_layers", 0) or 0)
@@ -720,7 +695,6 @@ def _nvidia_gpu_visible() -> bool:
 
 
 def _preload_cuda_libraries() -> None:
-    """Expose CUDA runtime wheels to llama.cpp without a global CUDA Toolkit."""
     if platform.system() != "Linux":
         return
     purelib = Path(sysconfig.get_paths()["purelib"])

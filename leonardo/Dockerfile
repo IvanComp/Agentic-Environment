@@ -1,9 +1,6 @@
 FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS llama-builder
 
 ARG LLAMA_CPP_VERSION=0.3.33
-# LEONARDO Booster nodes have NVIDIA A100 GPUs (compute capability 8.0).
-# Building only for this architecture keeps the CUDA library small enough
-# for the GitHub-hosted runner disk and shortens the build considerably.
 ARG CUDA_ARCHITECTURES=80
 ENV DEBIAN_FRONTEND=noninteractive \
     CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHITECTURES}" \
