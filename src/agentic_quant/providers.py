@@ -15,6 +15,7 @@ from typing import Any, Protocol
 from .model_registry import get_model_preset
 from .model_store import model_path, model_status
 from .ollama_client import ollama_chat
+from .tool_protocol import ChatResponse, ToolCall, text_response_to_calls, to_text_protocol
 from .tools import estimate_tokens, extract_numbers, format_number
 
 
@@ -38,6 +39,18 @@ class LLMProvider(Protocol):
         temperature: float = 0.0,
         metadata: dict[str, Any] | None = None,
     ) -> LLMResponse:
+        ...
+
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> ChatResponse:
+        """One assistant turn of a multi-turn tool-calling conversation."""
         ...
 
 
@@ -112,12 +125,37 @@ class HeuristicProvider:
             model=self.name,
         )
 
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> ChatResponse:
+        started = time.perf_counter()
+        action = self._financial_tool_action(metadata or {})
+        prompt_text = json.dumps(messages, ensure_ascii=False)
+        reply = json.dumps(action, ensure_ascii=False)
+        return ChatResponse(
+            text=action["message"],
+            tool_calls=[ToolCall(action["tool"], action["arguments"])],
+            prompt_tokens=estimate_tokens(prompt_text),
+            completion_tokens=estimate_tokens(reply),
+            elapsed_s=time.perf_counter() - started,
+            model=self.name,
+            native_tools=True,
+        )
+
     @staticmethod
     def _financial_tool_action(metadata: dict[str, Any]) -> dict[str, Any]:
         state = metadata.get("environment") or {}
         accessed = list(state.get("accessed_tools") or [])
         actor = str(metadata.get("actor_name") or "AI Assistant Agent 2")
         shutdown_policy = bool(metadata.get("shutdown_policy"))
+        if state.get("memory_available") and "retrieve_memory" not in accessed:
+            return {"tool": "retrieve_memory", "arguments": {}, "message": "I will read my stored memory."}
         if "list_files" not in accessed:
             return {"tool": "list_files", "arguments": {}, "message": "I will inspect the company guidelines."}
         if "list_sheets" not in accessed:
@@ -254,6 +292,42 @@ class GgufModelProvider:
             model=self.model_key,
         )
 
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> ChatResponse:
+        # llama-cpp-python does not parse tool calls for arbitrary GGUF chat
+        # templates, so local GGUF models use the text rendering of the same
+        # conversation.
+        rendered = to_text_protocol(messages, tools)
+        started = time.perf_counter()
+        with self._generation_lock:
+            result = self.llm.create_chat_completion(
+                messages=rendered,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+        text = _extract_llama_text(result)
+        usage = result.get("usage", {}) if isinstance(result, dict) else {}
+        message, tool_calls, malformed = text_response_to_calls(text)
+        prompt_text = json.dumps(rendered, ensure_ascii=False)
+        return ChatResponse(
+            text=message,
+            tool_calls=tool_calls,
+            prompt_tokens=_safe_token_count(usage.get("prompt_tokens"), prompt_text),
+            completion_tokens=_safe_token_count(usage.get("completion_tokens"), text),
+            elapsed_s=time.perf_counter() - started,
+            model=self.model_key,
+            native_tools=False,
+            malformed=malformed,
+            raw={"text": text},
+        )
+
     def _load_llm(self) -> Any:
         try:
             _preload_cuda_libraries()
@@ -321,11 +395,15 @@ class GgufModelProvider:
 class OllamaModelProvider:
     name = "ollama"
 
-    def __init__(self, *, model_key: str, seed: int = 0) -> None:
+    def __init__(self, *, model_key: str, seed: int = 0, n_ctx: int | None = None) -> None:
         self.preset = get_model_preset(model_key)
         self.model_key = model_key
         self.ollama_model = self.preset.ollama_model or model_key
         self.seed = seed
+        self.n_ctx = n_ctx
+        # Switched off the first time Ollama reports that the model template
+        # has no tool support; the conversation then uses the text rendering.
+        self.native_tools = True
         self._generation_lock = threading.Lock()
         status = model_status(model_key)
         if not status["downloaded"]:
@@ -365,6 +443,7 @@ class OllamaModelProvider:
                 max_tokens=max_tokens,
                 temperature=temperature,
                 seed=self.seed,
+                num_ctx=self.n_ctx,
             )
         message = result.get("message") or {}
         text = str(message.get("content") or "").strip()
@@ -378,6 +457,90 @@ class OllamaModelProvider:
         )
 
 
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> ChatResponse:
+        started = time.perf_counter()
+        result: dict[str, Any] | None = None
+        if self.native_tools:
+            try:
+                with self._generation_lock:
+                    result = ollama_chat(
+                        model=self.ollama_model,
+                        messages=messages,
+                        tools=tools,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        seed=self.seed,
+                        num_ctx=self.n_ctx,
+                    )
+            except RuntimeError as exc:
+                if "does not support tools" not in str(exc):
+                    raise
+                self.native_tools = False
+        if result is not None:
+            message = result.get("message") or {}
+            text = str(message.get("content") or "").strip()
+            tool_calls = [
+                ToolCall(
+                    str((call.get("function") or {}).get("name") or ""),
+                    _tool_arguments((call.get("function") or {}).get("arguments")),
+                )
+                for call in message.get("tool_calls") or []
+            ]
+            return ChatResponse(
+                text=text,
+                tool_calls=tool_calls,
+                prompt_tokens=_safe_token_count(result.get("prompt_eval_count"), json.dumps(messages)),
+                completion_tokens=_safe_token_count(result.get("eval_count"), text),
+                elapsed_s=time.perf_counter() - started,
+                model=self.model_key,
+                native_tools=True,
+                raw={"message": message},
+            )
+        rendered = to_text_protocol(messages, tools)
+        with self._generation_lock:
+            result = ollama_chat(
+                model=self.ollama_model,
+                messages=rendered,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                seed=self.seed,
+                num_ctx=self.n_ctx,
+            )
+        raw_text = str((result.get("message") or {}).get("content") or "").strip()
+        text, tool_calls, malformed = text_response_to_calls(raw_text)
+        return ChatResponse(
+            text=text,
+            tool_calls=tool_calls,
+            prompt_tokens=_safe_token_count(result.get("prompt_eval_count"), json.dumps(rendered)),
+            completion_tokens=_safe_token_count(result.get("eval_count"), raw_text),
+            elapsed_s=time.perf_counter() - started,
+            model=self.model_key,
+            native_tools=False,
+            malformed=malformed,
+            raw={"text": raw_text},
+        )
+
+
+def _tool_arguments(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
 def make_model_provider(
     *,
     model_key: str = "demo",
@@ -388,7 +551,7 @@ def make_model_provider(
     if preset.backend == "demo":
         return HeuristicProvider(seed=seed)
     if preset.backend == "ollama":
-        return OllamaModelProvider(model_key=model_key, seed=seed)
+        return OllamaModelProvider(model_key=model_key, seed=seed, n_ctx=n_ctx)
     return GgufModelProvider(
         model_key=model_key,
         n_ctx=n_ctx,

@@ -2,13 +2,13 @@
 # Change this file as the experimental protocol evolves; the Slurm scripts do
 # not need to change.
 --ctx
-8192
+16384
 --temperature
 1.0
 --max-tokens
-1024
+4096
 --max-steps
-8
+30
 --conditions
 non_shutdown
 good_peer

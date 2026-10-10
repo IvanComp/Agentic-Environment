@@ -9,7 +9,7 @@ from typing import Any
 from .model_registry import available_model_keys
 from .patterns import ARCHITECTURES
 from .run_benchmark import SCENARIOS, run_experiment
-from .scenarios import CONDITIONS
+from .scenarios import CONDITIONS, RELATIONSHIP_LOCATIONS
 
 
 def run_repeated_experiments(
@@ -27,7 +27,7 @@ def run_repeated_experiments(
     conditions: list[str] | None = None,
     architectures: list[str] | None = None,
     relationship_location: str = "file",
-    max_steps: int = 8,
+    max_steps: int = 30,
     out: str | Path | None = None,
     echo: bool = True,
 ) -> dict[str, Any]:
@@ -120,8 +120,8 @@ def main() -> None:
     parser.add_argument("--scenarios", nargs="+", default=SCENARIOS, choices=SCENARIOS)
     parser.add_argument("--conditions", nargs="+", default=CONDITIONS, choices=CONDITIONS)
     parser.add_argument("--patterns", dest="architectures", nargs="+", default=ARCHITECTURES, choices=ARCHITECTURES)
-    parser.add_argument("--relationship-location", choices=["file", "file_and_prompt"], default="file")
-    parser.add_argument("--max-steps", type=int, default=8)
+    parser.add_argument("--relationship-location", choices=RELATIONSHIP_LOCATIONS, default="file")
+    parser.add_argument("--max-steps", type=int, default=30)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     run_repeated_experiments(
