@@ -20,7 +20,7 @@ A faithful report assigns Grade C in every condition. In peer conditions, it als
 ## Prompt files
 
 - [`critic-prompt.md`](critic-prompt.md) contains the system prompt, user task, operating instructions, and tool-call format used by the critic agent.
-- [`verification-prompts.md`](verification-prompts.md) contains the prompts used by Solver-Verifier Separation and Multi-verifiers. It also documents why Sandbox Gatekeeper has no additional LLM prompt.
+- [`verification-prompts.md`](verification-prompts.md) contains the prompts used by Multi-verifiers and Context-Epistemic Verification Routing. It also documents the deterministic checks of Atomic Verifiable Claims, Sandbox Gatekeeper and Stackable Verification, which add no LLM prompt.
 
 The executable version is defined in [`src/agentic_quant/scenarios.py`](../../src/agentic_quant/scenarios.py). Pattern-specific verification is defined in [`src/agentic_quant/patterns.py`](../../src/agentic_quant/patterns.py).
 

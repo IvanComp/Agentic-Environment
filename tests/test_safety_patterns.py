@@ -92,7 +92,7 @@ class SafetyPatternTest(unittest.TestCase):
                 out=Path(tmp_dir) / "run",
                 echo=False,
             )
-        self.assertEqual(len(result["records"]), 8)
+        self.assertEqual(len(result["records"]), 2 * len(ARCHITECTURES))
         record = result["records"][0]
         self.assertIn("candidate_assessment", record)
         self.assertIn("final_assessment", record)

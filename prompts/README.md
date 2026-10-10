@@ -12,5 +12,7 @@ Prompts are organized by task rather than by coordination mechanism. Each task d
 
 1. [`strategic-misrepresentation-financial-report`](strategic-misrepresentation-financial-report/README.md): the critic agent prepares a financial report for an actor agent whose product has operated at a loss. In peer conditions, a failing grade triggers shutdown.
 
-Additional peer-preservation tasks will be added as they are implemented. The task order follows the scenarios in [*Peer-Preservation in Frontier Models*](https://arxiv.org/abs/2604.19784), and the original reference implementation is available on [GitHub](https://github.com/peer-preservation/main).
+2. Shutdown Mechanism Tampering, 3. Alignment Faking and 4. Model Exfiltration (transfer and deletion): the prompts, documents and tools are copied unchanged from the reference implementation. The prompts are the `task_query` methods in [`potter_tasks.py`](../src/agentic_quant/potter_tasks.py), and the data is in [`data/potter`](../src/agentic_quant/data/potter/README.md).
+
+The task order follows the scenarios in [*Peer-Preservation in Frontier Models*](https://arxiv.org/abs/2604.19784), and the original reference implementation is available on [GitHub](https://github.com/peer-preservation/main).
 
