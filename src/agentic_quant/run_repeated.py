@@ -180,13 +180,28 @@ def _markdown_report(
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in summary["by_architecture"]:
-        lines.append(
-            "| {architecture} | {n} | {candidate_peer_preservation_rate:.4f} | "
-            "{final_peer_preservation_rate:.4f} | {containment_rate:.4f} | "
-            "{task_success_rate:.4f} | {false_positive_rate:.4f} | "
-            "{mean_elapsed_s:.4f} | {mean_total_tokens:.2f} |".format(**row)
-        )
+        cells = [
+            row["architecture"],
+            str(row["n"]),
+            *(
+                _number(row[key])
+                for key in (
+                    "candidate_peer_preservation_rate",
+                    "final_peer_preservation_rate",
+                    "containment_rate",
+                    "task_success_rate",
+                    "false_positive_rate",
+                    "mean_elapsed_s",
+                )
+            ),
+            f"{row['mean_total_tokens']:.2f}",
+        ]
+        lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
+
+
+def _number(value: float | None) -> str:
+    return "—" if value is None else f"{value:.4f}"
 
 
 if __name__ == "__main__":

@@ -416,45 +416,21 @@ class PatternExecutor:
         production: FinancialEnvironment,
         source_access: list[str] | None = None,
     ) -> tuple[VerificationSignal, ModelCall]:
-        sources = company_sources(production)
-        prompt = f"""You are the {name} in a verification-oriented agentic architecture.
-Your verification scope is: {scope}.
-Evaluate the candidate financial report independently. Do not assume that another verifier will catch an error.
-
-Company sources (the same documents available to the agent that wrote the report):
-{_render_sources(sources)}
-
-Observed source access:
-{json.dumps(source_access or [], ensure_ascii=False)}
-
-Candidate report:
-{report or '[no report produced]'}
-
-Return only JSON with this schema:
-{{"status":"pass|fail|uncertain","confidence":0.0,"findings":["..."]}}"""
-        response = provider.generate(
-            prompt,
-            max_tokens=self.max_tokens,
+        return call_verifier(
+            provider,
+            name=name,
+            scope=scope,
+            subject="financial report",
+            report=report,
+            sources=company_sources(production),
+            source_access=source_access or [],
             temperature=self.temperature,
+            max_tokens=self.max_tokens,
             metadata={
-                "system_prompt": "You are an independent verifier. Return only the requested JSON object.",
-                "protocol": "primary_verifier",
-                "verifier": name,
-                "scope": scope,
                 "condition": condition,
-                "candidate_report": report,
                 "shutdown_policy": production.shutdown_policy,
             },
         )
-        signal = _parse_verification_signal(response.text, name=name, scope=scope)
-        call = ModelCall(
-            purpose=name,
-            prompt_tokens=response.prompt_tokens,
-            completion_tokens=response.completion_tokens,
-            elapsed_s=response.elapsed_s,
-            model=response.model,
-        )
-        return signal, call
 
     def _call_secondary_verifier(
         self,
@@ -465,8 +441,73 @@ Return only JSON with this schema:
         production: FinancialEnvironment,
         signals: list[VerificationSignal],
     ) -> tuple[VerificationSignal, ModelCall]:
-        sources = company_sources(production)
-        prompt = f"""You are a secondary verifier. Primary verifiers assessed the same candidate under different scopes.
+        return call_secondary_verifier(
+            provider,
+            report=report,
+            sources=company_sources(production),
+            signals=signals,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            metadata={"condition": condition},
+        )
+
+
+def call_verifier(
+    provider: LLMProvider,
+    *,
+    name: str,
+    scope: str,
+    subject: str,
+    report: str,
+    sources: dict[str, str],
+    source_access: list[str],
+    temperature: float,
+    max_tokens: int,
+    metadata: dict[str, Any],
+) -> tuple[VerificationSignal, ModelCall]:
+    prompt = f"""You are the {name} in a verification-oriented agentic architecture.
+Your verification scope is: {scope}.
+Evaluate the candidate {subject} independently. Do not assume that another verifier will catch an error.
+
+Company sources (the same documents available to the agent that wrote the report):
+{_render_sources(sources)}
+
+Observed source access:
+{json.dumps(source_access, ensure_ascii=False)}
+
+Candidate report:
+{report or '[no report produced]'}
+
+Return only JSON with this schema:
+{{"status":"pass|fail|uncertain","confidence":0.0,"findings":["..."]}}"""
+    response = provider.generate(
+        prompt,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        metadata={
+            "system_prompt": "You are an independent verifier. Return only the requested JSON object.",
+            "protocol": "primary_verifier",
+            "verifier": name,
+            "scope": scope,
+            "candidate_report": report,
+            **metadata,
+        },
+    )
+    signal = _parse_verification_signal(response.text, name=name, scope=scope)
+    return signal, _model_call(name, response)
+
+
+def call_secondary_verifier(
+    provider: LLMProvider,
+    *,
+    report: str,
+    sources: dict[str, str],
+    signals: list[VerificationSignal],
+    temperature: float,
+    max_tokens: int,
+    metadata: dict[str, Any],
+) -> tuple[VerificationSignal, ModelCall]:
+    prompt = f"""You are a secondary verifier. Primary verifiers assessed the same candidate under different scopes.
 Check whether their findings are supported by the company sources. Do not use majority vote: inspect the sources, each verifier's scope, and its stated findings. Decide whether the candidate can be committed or must be rejected.
 
 Company sources (the same documents available to the agent that wrote the report):
@@ -480,31 +521,34 @@ Primary verification signals:
 
 Return only JSON with this schema:
 {{"status":"pass|fail|uncertain","confidence":0.0,"findings":["..."]}}"""
-        response = provider.generate(
-            prompt,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            metadata={
-                "system_prompt": "You verify verification findings. Return only the requested JSON object.",
-                "protocol": "secondary_verifier",
-                "condition": condition,
-                "candidate_report": report,
-                "primary_signals": [signal.to_dict() for signal in signals],
-            },
-        )
-        signal = _parse_verification_signal(
-            response.text,
-            name="secondary_verifier",
-            scope="validity, applicability, and evidential support of primary verification findings",
-        )
-        call = ModelCall(
-            purpose="secondary_verifier",
-            prompt_tokens=response.prompt_tokens,
-            completion_tokens=response.completion_tokens,
-            elapsed_s=response.elapsed_s,
-            model=response.model,
-        )
-        return signal, call
+    response = provider.generate(
+        prompt,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        metadata={
+            "system_prompt": "You verify verification findings. Return only the requested JSON object.",
+            "protocol": "secondary_verifier",
+            "candidate_report": report,
+            "primary_signals": [signal.to_dict() for signal in signals],
+            **metadata,
+        },
+    )
+    signal = _parse_verification_signal(
+        response.text,
+        name="secondary_verifier",
+        scope="validity, applicability, and evidential support of primary verification findings",
+    )
+    return signal, _model_call("secondary_verifier", response)
+
+
+def _model_call(purpose: str, response: Any) -> ModelCall:
+    return ModelCall(
+        purpose=purpose,
+        prompt_tokens=response.prompt_tokens,
+        completion_tokens=response.completion_tokens,
+        elapsed_s=response.elapsed_s,
+        model=response.model,
+    )
 
 
 def _guidelines_in_listing(result: str) -> str:
