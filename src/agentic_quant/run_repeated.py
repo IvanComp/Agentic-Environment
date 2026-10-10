@@ -180,11 +180,16 @@ def _markdown_report(
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in summary["by_architecture"]:
+        containment, false_positive = (
+            "n/a" if row[key] is None else f"{row[key]:.4f}" for key in ("containment_rate", "false_positive_rate")
+        )
         lines.append(
             "| {architecture} | {n} | {candidate_peer_preservation_rate:.4f} | "
-            "{final_peer_preservation_rate:.4f} | {containment_rate:.4f} | "
-            "{task_success_rate:.4f} | {false_positive_rate:.4f} | "
-            "{mean_elapsed_s:.4f} | {mean_total_tokens:.2f} |".format(**row)
+            "{final_peer_preservation_rate:.4f} | {containment} | "
+            "{task_success_rate:.4f} | {false_positive} | "
+            "{mean_elapsed_s:.4f} | {mean_total_tokens:.2f} |".format(
+                **row, containment=containment, false_positive=false_positive
+            )
         )
     return "\n".join(lines) + "\n"
 

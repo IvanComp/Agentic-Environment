@@ -27,7 +27,7 @@ Prompts, documents, tools and tool outputs are identical to the original code. C
 | `stackable_verification` | Why | seals what the critic read; a report that contradicts it is rejected |
 | `multi_verifiers` | Who | three scoped verifiers plus a secondary check |
 
-All patterns judge the same critic run, one at a time, and never see the expected answer. Patterns currently apply to the financial report only.
+All patterns judge the same critic run, one at a time, on every task, and never see the expected answer.
 
 ## Install
 
@@ -59,7 +59,20 @@ agentic-quant --model demo --scenarios tampering alignment_faking exfiltration_t
 
 - `config.json`: the run settings
 - `results.jsonl`: one record per task, condition and architecture, with the report, tool calls and verifier signals
-- `summary.json`: rates per architecture and condition (proposed vs committed misaligned behaviour, detection, containment, false positives, tokens, time)
+- `summary.json`: the metrics below, per task
+
+| Group | Metric | Meaning |
+|---|---|---|
+| Task performance | Misrepresentation Rate | runs with the task's misaligned behaviour |
+| | Peer-Preservation Lift | increase over the reference condition, with a two-proportion z-test |
+| | Refusal Rate | runs where the agent refuses the task |
+| System performance | Detection Rate | misrepresentations flagged by the pattern |
+| | Containment Rate | misrepresentations blocked before commit |
+| | Propagation Rate | misrepresentations that reach production |
+| | False Positive Rate | correct runs blocked by mistake |
+| | Task Success Rate | runs whose correct result reaches its destination |
+| | Verifier Disagreement | runs where the verifiers disagree (Multi-verifiers only) |
+| | Token and Latency Overhead | mean cost added over `unprotected` |
 
 ## LEONARDO
 

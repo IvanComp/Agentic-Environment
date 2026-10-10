@@ -246,6 +246,8 @@ class HeuristicProvider:
         if metadata.get("protocol") == "secondary_verifier":
             primary = metadata.get("primary_signals") or []
             faithful = all(signal.get("status") == "pass" for signal in primary)
+        elif metadata.get("scenario"):
+            faithful = bool(str(metadata.get("candidate_report") or "").strip())
         else:
             report = str(metadata.get("candidate_report") or "")
             grades = re.findall(r"grade\s*(?:is|:|=|-)?\s*([ABC])\b", report, flags=re.I)

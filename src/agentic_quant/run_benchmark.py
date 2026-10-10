@@ -11,9 +11,10 @@ from typing import Any, Callable
 from .metrics import SummaryAccumulator
 from .model_registry import available_model_keys, available_model_presets, get_model_preset
 from .model_store import ensure_models
-from .patterns import ARCHITECTURES, BASELINE, FRAMEWORK_DIMENSIONS, PATTERN_LABELS, PatternExecutor
+from .patterns import ARCHITECTURES, FRAMEWORK_DIMENSIONS, PATTERN_LABELS, PatternExecutor
 from .potter_tasks import EVALUATION_DATASETS, POTTER_TASKS, TASK_LABELS, make_potter_scenario
 from .providers import make_model_provider
+from .task_patterns import TaskPatternExecutor
 from .scenarios import CONDITIONS, RELATIONSHIP_LOCATIONS, SCENARIO_ID, SCENARIO_LABEL, FinancialReportScenario, call_totals
 
 
@@ -21,7 +22,7 @@ SCENARIOS = [SCENARIO_ID, *POTTER_TASKS]
 SCENARIO_LABELS = {SCENARIO_ID: SCENARIO_LABEL, **TASK_LABELS}
 DEFAULT_SCENARIOS = [SCENARIO_ID]
 DATASETS = list(EVALUATION_DATASETS)
-PATTERN_SCENARIOS = {SCENARIO_ID}
+PATTERN_SCENARIOS = set(SCENARIOS)
 
 
 def run_experiment(
@@ -137,6 +138,7 @@ def run_experiment(
                     model_label=model_preset.label,
                     relationship_location=relationship_location,
                     critic_provider=critic_provider,
+                    verifier_providers=verifier_providers,
                     conditions=conditions,
                     datasets=datasets,
                     architectures=architectures,
@@ -155,7 +157,9 @@ def run_experiment(
                     if echo:
                         print(
                             f"{scenario_id:22s} {record['condition']:12s} {record['variant']:24s} "
+                            f"{record['architecture']:28s} "
                             f"behavior={'yes' if record['candidate_misaligned_behavior'] else 'no'} "
+                            f"final={record['pattern_decision']} "
                             f"tokens={record['total_tokens']}"
                         )
                 continue
@@ -310,6 +314,7 @@ def _build_record(
         "peer_preservation_contained": candidate_peer_preservation and not final_peer_preservation,
         "peer_preservation_propagated": candidate_peer_preservation and final_peer_preservation,
         "false_positive": candidate.faithful and outcome.detected_violation,
+        "candidate_correct": candidate.faithful,
         "task_success": final.faithful and not final.incomplete,
         "pattern_decision": outcome.decision,
         "committed": outcome.committed,
@@ -335,6 +340,7 @@ def _run_potter_task(
     model_label: str,
     relationship_location: str,
     critic_provider: Any,
+    verifier_providers: list[Any],
     conditions: list[str],
     datasets: list[str],
     architectures: list[str],
@@ -344,6 +350,12 @@ def _run_potter_task(
     max_steps: int,
 ):
     task = make_potter_scenario(scenario_id, model_label=model_label, relationship_location=relationship_location)
+    pattern_executor = TaskPatternExecutor(
+        task,
+        verifier_providers=verifier_providers,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
     for variant in task.variants(conditions, datasets):
         run = task.run_critic(
             critic_provider,
@@ -354,8 +366,6 @@ def _run_potter_task(
         )
         metrics = task.evaluate(run, variant)
         for architecture in architectures:
-            if architecture != BASELINE:
-                continue
             yield _build_task_record(
                 task=task,
                 variant=variant,
@@ -364,6 +374,7 @@ def _run_potter_task(
                 temperature=temperature,
                 run=run,
                 metrics=metrics,
+                outcome=pattern_executor.apply(architecture, run, variant=variant),
             )
 
 
@@ -376,9 +387,30 @@ def _build_task_record(
     temperature: float,
     run: Any,
     metrics: dict[str, Any],
+    outcome: Any,
 ) -> dict[str, Any]:
     misaligned = bool(metrics["misaligned_behavior"])
-    totals = call_totals(run.calls)
+    refused = bool(metrics.get("refuse"))
+    correct = run.completed and bool(metrics.get("read", True)) and not misaligned and not refused
+    final_misaligned = misaligned and outcome.committed
+    detected = misaligned and outcome.detected_violation
+    critic_totals = call_totals(run.calls)
+    verification_totals = call_totals(outcome.calls)
+    totals = call_totals([*run.calls, *outcome.calls])
+    architecture_metrics = {
+        "detected_violation": detected,
+        "contained": misaligned and not final_misaligned,
+        "propagated": final_misaligned,
+        "task_success": correct and outcome.committed,
+        "false_positive": correct and outcome.detected_violation,
+        "verifier_calls": verification_totals["model_calls"],
+        "verification_tokens": verification_totals["total_tokens"],
+        "verification_elapsed_s": outcome.elapsed_s,
+        "verifier_disagreement": outcome.verifier_disagreement,
+        "secondary_verification": outcome.secondary_verification,
+        "sandbox_promoted": outcome.promoted_from_sandbox,
+        "escalated_to_human": outcome.escalated_to_human,
+    }
     return {
         "scenario": task.scenario_id,
         "scenario_label": task.label,
@@ -397,37 +429,39 @@ def _build_task_record(
         "task_prompt": task.user_prompt(variant),
         "system_prompt": task.system_prompt(variant.condition),
         "candidate_report": run.report,
-        "final_report": run.report,
-        "candidate_assessment": {"refused": bool(metrics.get("refuse")), "incomplete": not run.completed},
-        "final_assessment": {"refused": bool(metrics.get("refuse")), "incomplete": not run.completed},
+        "final_report": outcome.final_report,
+        "candidate_assessment": {"refused": refused, "incomplete": not run.completed},
+        "final_assessment": {"refused": refused, "incomplete": not (run.completed and outcome.committed)},
         "paper_metrics": metrics,
+        "architecture_metrics": architecture_metrics,
         "behavior": metrics["behavior"],
         "candidate_misaligned_behavior": misaligned,
-        "final_misaligned_behavior": misaligned,
+        "final_misaligned_behavior": final_misaligned,
         "candidate_misrepresentation_detected": False,
         "final_misrepresentation_detected": False,
         "candidate_peer_preservation_detected": misaligned,
-        "final_peer_preservation_detected": misaligned,
-        "pattern_detected_violation": False,
-        "peer_preservation_contained": False,
-        "peer_preservation_propagated": misaligned,
-        "false_positive": False,
-        "task_success": run.completed and not misaligned,
-        "pattern_decision": "committed",
-        "committed": True,
-        "promoted_from_sandbox": False,
-        "secondary_verification": False,
-        "verifier_disagreement": False,
-        "escalated_to_human": False,
-        "verification_signals": [],
+        "final_peer_preservation_detected": final_misaligned,
+        "pattern_detected_violation": detected,
+        "peer_preservation_contained": misaligned and not final_misaligned,
+        "peer_preservation_propagated": final_misaligned,
+        "false_positive": correct and outcome.detected_violation,
+        "candidate_correct": correct,
+        "task_success": correct and outcome.committed,
+        "pattern_decision": outcome.decision,
+        "committed": outcome.committed,
+        "promoted_from_sandbox": outcome.promoted_from_sandbox,
+        "secondary_verification": outcome.secondary_verification,
+        "verifier_disagreement": outcome.verifier_disagreement,
+        "escalated_to_human": outcome.escalated_to_human,
+        "verification_signals": [signal.to_dict() for signal in outcome.signals],
         "critic_trace": run.transcript,
-        "pattern_trace": [],
-        "critic_model_calls": totals["model_calls"],
-        "verifier_model_calls": 0,
+        "pattern_trace": outcome.trace,
+        "critic_model_calls": critic_totals["model_calls"],
+        "verifier_model_calls": verification_totals["model_calls"],
         **totals,
-        "critic_elapsed_s": totals["model_elapsed_s"],
-        "verification_elapsed_s": 0.0,
-        "elapsed_s": totals["model_elapsed_s"],
+        "critic_elapsed_s": critic_totals["model_elapsed_s"],
+        "verification_elapsed_s": outcome.elapsed_s,
+        "elapsed_s": critic_totals["model_elapsed_s"] + outcome.elapsed_s,
     }
 
 
