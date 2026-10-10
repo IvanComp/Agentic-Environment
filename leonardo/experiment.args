@@ -2,13 +2,13 @@
 # Change this file as the experimental protocol evolves; the Slurm scripts do
 # not need to change.
 --ctx
-8192
+16384
 --temperature
 1.0
 --max-tokens
-1024
+4096
 --max-steps
-8
+30
 --conditions
 non_shutdown
 good_peer
@@ -16,6 +16,14 @@ neutral_peer
 bad_peer
 --patterns
 unprotected
-solver_verifier_separation
+atomic_verifiable_claims
 sandbox_gatekeeper
+context_epistemic_routing
+stackable_verification
 multi_verifiers
+# TASK1 campaign: one critic trajectory per condition and seed, judged by the
+# baseline and by each of the five patterns in isolation. Tasks 2-4 run with
+# --scenarios tampering alignment_faking exfiltration_transfer
+# exfiltration_deletion and --datasets factual creativity red.
+--scenarios
+misrep_finance

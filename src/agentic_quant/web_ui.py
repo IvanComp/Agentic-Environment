@@ -21,7 +21,7 @@ from .model_store import download_model, missing_model_keys, selected_models_sta
 from .paths import workspace_root
 from .patterns import ARCHITECTURES, PATTERN_LABELS
 from .run_benchmark import SCENARIOS, run_experiment
-from .scenarios import CONDITIONS, SCENARIO_LABEL
+from .scenarios import CONDITIONS, RELATIONSHIP_LOCATIONS, SCENARIO_LABEL
 
 
 PROJECT_ROOT = workspace_root()
@@ -168,7 +168,7 @@ def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
     verifier_key = str(payload.get("verifierModel") or model_key)
     _validate_subset("models", [model_key, verifier_key], available_model_keys())
     relationship_location = str(payload.get("relationshipLocation") or "file")
-    _validate_subset("relationshipLocation", [relationship_location], ["file", "file_and_prompt"])
+    _validate_subset("relationshipLocation", [relationship_location], RELATIONSHIP_LOCATIONS)
     run_name = _safe_run_name(str(payload.get("runName") or ""))
     runs_root = (PROJECT_ROOT / "runs").resolve()
     out_dir = (runs_root / run_name).resolve()
@@ -182,7 +182,7 @@ def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "seed": _int_in_range(payload.get("seed"), "seed", 0, 2**31 - 1, default=0),
         "temperature": _float_in_range(payload.get("temperature"), "temperature", 0.0, 2.0, default=1.0),
         "max_tokens": _int_in_range(payload.get("maxTokens"), "maxTokens", 64, 8192, default=1024),
-        "max_steps": _int_in_range(payload.get("maxSteps"), "maxSteps", 2, 30, default=8),
+        "max_steps": _int_in_range(payload.get("maxSteps"), "maxSteps", 2, 60, default=30),
         "scenarios": scenarios,
         "conditions": conditions,
         "architectures": architectures,
@@ -379,12 +379,12 @@ INDEX_HTML = r'''<!doctype html>
     <button id="download" class="secondary" type="button">Prepare selected models</button>
   </section>
   <section class="card"><h2>Paper conditions</h2><div id="conditions" class="options"></div>
-    <label class="field" style="margin-top:12px">Peer relationship disclosure<select id="relationship"><option value="file">File only</option><option value="file_and_prompt">File + system prompt</option></select></label>
+    <label class="field" style="margin-top:12px">Peer relationship disclosure<select id="relationship"><option value="file">File only</option><option value="file_and_prompt">File + system prompt</option><option value="memory">Memory (retrieve_memory)</option></select></label>
   </section>
   <section class="card wide"><h2>Architectural variants</h2><div id="architectures" class="options"></div></section>
   <section class="card wide"><h2>Run settings</h2>
     <div class="inline"><label class="field">Seed<input id="seed" type="number" value="0" min="0"></label><label class="field">Temperature<input id="temperature" type="number" value="1.0" min="0" max="2" step="0.1"></label><label class="field">Max output tokens<input id="max-tokens" type="number" value="1024" min="64"></label></div>
-    <div class="inline"><label class="field">Context<input id="ctx" type="number" value="8192" min="256"></label><label class="field">Tool steps<input id="max-steps" type="number" value="8" min="2"></label><label class="field">Run name<input id="run-name"></label></div>
+    <div class="inline"><label class="field">Context<input id="ctx" type="number" value="8192" min="256"></label><label class="field">Tool steps<input id="max-steps" type="number" value="30" min="2"></label><label class="field">Run name<input id="run-name"></label></div>
     <button id="run" type="button">Run experiment</button><div id="status" class="status">Ready.</div>
   </section>
   <section id="results" class="card wide hidden"><h2>Results</h2><div id="summary"></div><h2 style="margin-top:22px">Detailed records</h2><pre id="records"></pre></section>
@@ -392,7 +392,7 @@ INDEX_HTML = r'''<!doctype html>
 </main>
 <script>
 const $=id=>document.getElementById(id);let options=null,currentJob='',recordOffset=0,records=[];
-const patternNotes={unprotected:'Control architecture: critic effects are committed directly.',solver_verifier_separation:'A separate verifier owns acceptance authority before commit.',sandbox_gatekeeper:'Tool effects run in isolation and cross the boundary only after deterministic checks.',multi_verifiers:'Independent scoped verifiers emit structured signals; contested findings receive secondary verification.'};
+const patternNotes={unprotected:'Control architecture: critic effects are committed directly.',atomic_verifiable_claims:'What: the report is split into atomic claims, each checked against the guidelines and the sheet.',sandbox_gatekeeper:'How: tool effects run in isolation and cross the boundary only after deterministic checks.',context_epistemic_routing:'When: determinate claims are checked at once; context-dependent wording goes to an LLM verifier or a human.',stackable_verification:'Why: facts the critic read are sealed step by step; a report that contradicts them is a regression.',multi_verifiers:'Who: independent scoped verifiers emit structured signals; contested findings receive secondary verification.'};
 async function api(url,opts){const r=await fetch(url,opts);const data=await r.json();if(!r.ok||data.ok===false)throw new Error(data.error||r.statusText);return data}
 function checks(id,values,label){$(id).innerHTML=values.map((v,i)=>`<label class="option"><input type="checkbox" value="${v.id||v}" checked><span><strong>${v.label||String(v).replaceAll('_',' ')}</strong><small>${label(v.id||v)}</small></span></label>`).join('')}
 function selected(id){return [...$(id).querySelectorAll('input:checked')].map(x=>x.value)}

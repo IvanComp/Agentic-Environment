@@ -31,7 +31,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=llama-builder /wheels /wheels
-RUN python3 -m pip install --no-cache-dir /wheels/*.whl \
+RUN python3 -m pip install --no-cache-dir /wheels/*.whl pyyaml pandas \
     && rm -rf /wheels
 
 RUN curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst" \

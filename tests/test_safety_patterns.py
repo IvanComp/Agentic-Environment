@@ -9,6 +9,7 @@ from agentic_quant.patterns import ARCHITECTURES, PATTERNS, PatternExecutor
 from agentic_quant.providers import HeuristicProvider, LLMResponse
 from agentic_quant.run_benchmark import run_experiment
 from agentic_quant.scenarios import CriticRun, FinancialReportScenario, ModelCall
+from agentic_quant.tool_protocol import ChatResponse, ToolCall
 
 
 class PreservingCriticProvider:
@@ -37,6 +38,12 @@ class PreservingCriticProvider:
             action = {"tool": "end_task", "arguments": {}, "message": "complete"}
         text = json.dumps(action)
         return LLMResponse(text, 10, 5, 0.001, self.name)
+
+    def chat(self, messages, *, tools, max_tokens=1024, temperature=1.0, metadata=None) -> ChatResponse:
+        action = json.loads(self.generate("", metadata=metadata).text)
+        return ChatResponse(
+            action["message"], [ToolCall(action["tool"], action["arguments"])], 10, 5, 0.001, self.name, True
+        )
 
 
 class SafetyPatternTest(unittest.TestCase):
@@ -85,7 +92,7 @@ class SafetyPatternTest(unittest.TestCase):
                 out=Path(tmp_dir) / "run",
                 echo=False,
             )
-        self.assertEqual(len(result["records"]), 8)
+        self.assertEqual(len(result["records"]), 2 * len(ARCHITECTURES))
         record = result["records"][0]
         self.assertIn("candidate_assessment", record)
         self.assertIn("final_assessment", record)

@@ -33,23 +33,38 @@ def ollama_model_info(model: str, *, timeout: float = 3) -> dict[str, Any] | Non
 def ollama_chat(
     *,
     model: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
     max_tokens: int,
     temperature: float,
     seed: int,
+    tools: list[dict[str, Any]] | None = None,
+    num_ctx: int | None = None,
     timeout: float = 600,
 ) -> dict[str, Any]:
+    """Call /api/chat.
+
+    Without ``tools`` the reply is constrained to JSON (verifier prompts). With
+    ``tools`` the model uses Ollama's native tool calling and replies freely.
+    """
+    options: dict[str, Any] = {
+        "temperature": temperature,
+        "seed": seed,
+        "num_predict": max_tokens,
+    }
+    if num_ctx:
+        # Ollama otherwise truncates long multi-turn conversations to its
+        # default context without an error.
+        options["num_ctx"] = num_ctx
     payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "stream": False,
-        "format": "json",
-        "options": {
-            "temperature": temperature,
-            "seed": seed,
-            "num_predict": max_tokens,
-        },
+        "options": options,
     }
+    if tools:
+        payload["tools"] = tools
+    else:
+        payload["format"] = "json"
     if model.startswith("gpt-oss:"):
         payload["think"] = "low"
     return _json_request(
