@@ -47,24 +47,14 @@ class GgufModelProviderTest(unittest.TestCase):
         self.assertEqual(provider.compute_unit["label"], "GPU (Metal)")
         self.assertTrue(provider.compute_unit["verified"])
 
-    def test_compute_unit_indicator_is_shown_above_agent_count(self) -> None:
-        indicator = 'id="compute-unit"'
-        self.assertIn(indicator, INDEX_HTML)
-        self.assertIn("updateComputeUnit(job)", INDEX_HTML)
-        self.assertLess(INDEX_HTML.index(indicator), INDEX_HTML.index("Number of agents"))
-
-    def test_visual_report_button_is_next_to_download_and_uses_run_data(self) -> None:
-        visual_button = 'id="visual-report"'
-        download_button = 'id="download-report"'
-        self.assertIn(visual_button, INDEX_HTML)
-        self.assertIn('id="visual-report-modal"', INDEX_HTML)
-        self.assertIn("renderVisualReport(currentRunData)", INDEX_HTML)
-        self.assertLess(INDEX_HTML.index(visual_button), INDEX_HTML.index(download_button))
-
-    def test_a1_model_can_be_copied_to_every_agent(self) -> None:
-        self.assertIn('id="copy-agent-model"', INDEX_HTML)
-        self.assertIn("function copyFirstAgentModelToAll()", INDEX_HTML)
-        self.assertIn("select.value = firstModel", INDEX_HTML)
+    def test_ui_exposes_critic_verifier_and_architecture_selection(self) -> None:
+        self.assertIn('id="compute-unit"', INDEX_HTML)
+        self.assertIn('id="model"', INDEX_HTML)
+        self.assertIn('id="verifier-model"', INDEX_HTML)
+        self.assertIn('id="architectures"', INDEX_HTML)
+        self.assertIn("solver_verifier_separation", INDEX_HTML)
+        self.assertIn("sandbox_gatekeeper", INDEX_HTML)
+        self.assertIn("multi_verifiers", INDEX_HTML)
 
     def test_linux_nvidia_gpu_rejects_a_cpu_only_llama_build(self) -> None:
         llama = Mock()

@@ -181,7 +181,11 @@ def _download_model_locked(model_key: str, *, progress: ProgressCallback | None 
     if progress and completed_bytes:
         progress(completed_bytes, expected_total or completed_bytes)
 
-    for url, final_path in zip(preset.download_urls, final_paths, strict=True):
+    if len(preset.download_urls) != len(final_paths):
+        raise ValueError(
+            f"Preset {model_key!r} defines a different number of URLs and destination files."
+        )
+    for url, final_path in zip(preset.download_urls, final_paths):
         if final_path.is_file():
             continue
         tmp_path = final_path.with_suffix(final_path.suffix + ".part")

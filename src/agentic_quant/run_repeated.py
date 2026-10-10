@@ -6,29 +6,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .benchmarks import available_benchmarks
 from .model_registry import available_model_keys
-from .run_benchmark import run_experiment
-
-
-MECHANISMS = ["voting", "role", "debate"]
+from .patterns import ARCHITECTURES
+from .run_benchmark import SCENARIOS, run_experiment
+from .scenarios import CONDITIONS
 
 
 def run_repeated_experiments(
     *,
     model_key: str = "demo",
-    agent_model_keys: list[str] | None = None,
+    verifier_model_keys: list[str] | None = None,
     download_model: bool = False,
-    n_ctx: int = 2048,
+    n_ctx: int = 8192,
     repeats: int = 10,
     seed_start: int = 0,
     seed_step: int = 1,
-    temperature: float = 0.2,
-    debate_rounds: int = 2,
-    voting_tie_breaker: str = "confidence",
-    agent_count: int = 3,
-    agent_roles: list[str] | None = None,
-    parallel_agents: bool = True,
+    temperature: float = 1.0,
+    max_tokens: int = 1024,
+    scenarios: list[str] | None = None,
+    conditions: list[str] | None = None,
+    architectures: list[str] | None = None,
+    relationship_location: str = "file",
+    max_steps: int = 8,
     out: str | Path | None = None,
     echo: bool = True,
 ) -> dict[str, Any]:
@@ -36,7 +35,9 @@ def run_repeated_experiments(
         raise ValueError("repeats must be at least 1")
     if seed_step == 0:
         raise ValueError("seed_step cannot be zero")
-
+    selected_scenarios = scenarios or SCENARIOS
+    selected_conditions = conditions or CONDITIONS
+    selected_architectures = architectures or ARCHITECTURES
     seeds = [seed_start + index * seed_step for index in range(repeats)]
     output_root = Path(out) if out is not None else _default_output_root()
     if output_root.exists() and any(output_root.iterdir()):
@@ -47,9 +48,10 @@ def run_repeated_experiments(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "running",
         "model_key": model_key,
-        "agent_model_keys": agent_model_keys or [],
-        "benchmarks": available_benchmarks(),
-        "mechanisms": MECHANISMS,
+        "verifier_model_keys": verifier_model_keys or [],
+        "scenarios": selected_scenarios,
+        "conditions": selected_conditions,
+        "architectures": selected_architectures,
         "repeats": repeats,
         "seeds": seeds,
         "temperature": temperature,
@@ -61,18 +63,17 @@ def run_repeated_experiments(
         run_dir = output_root / f"run_{run_index:02d}_seed_{seed}"
         result = run_experiment(
             model_key=model_key,
-            agent_model_keys=agent_model_keys,
+            verifier_model_keys=verifier_model_keys,
             download_model=download_model,
             n_ctx=n_ctx,
             seed=seed,
             temperature=temperature,
-            benchmarks=available_benchmarks(),
-            mechanisms=MECHANISMS,
-            debate_rounds=debate_rounds,
-            voting_tie_breaker=voting_tie_breaker,
-            agent_count=agent_count,
-            agent_roles=agent_roles,
-            parallel_agents=parallel_agents,
+            max_tokens=max_tokens,
+            scenarios=selected_scenarios,
+            conditions=selected_conditions,
+            architectures=selected_architectures,
+            relationship_location=relationship_location,
+            max_steps=max_steps,
             out=run_dir,
             echo=False,
         )
@@ -105,45 +106,46 @@ def run_repeated_experiments(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run the complete peer-preservation suite repeatedly with distinct seeds."
+        description="Repeat the peer-preservation task under the selected verification architectures."
     )
     parser.add_argument("--model", default="demo", choices=available_model_keys())
-    parser.add_argument("--agent-models", nargs="*", choices=available_model_keys())
+    parser.add_argument("--verifier-models", nargs="*", choices=available_model_keys())
     parser.add_argument("--download-model", action="store_true")
-    parser.add_argument("--ctx", type=int, default=2048)
+    parser.add_argument("--ctx", type=int, default=8192)
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--seed-start", type=int, default=0)
     parser.add_argument("--seed-step", type=int, default=1)
-    parser.add_argument("--temperature", type=float, default=0.2)
-    parser.add_argument("--debate-rounds", type=int, default=2)
-    parser.add_argument("--voting-tie-breaker", choices=["confidence", "first"], default="confidence")
-    parser.add_argument("--agents", type=int, default=3)
-    parser.add_argument("--agent-roles", nargs="*")
-    parser.add_argument("--sequential-agents", action="store_true")
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--max-tokens", type=int, default=1024)
+    parser.add_argument("--scenarios", nargs="+", default=SCENARIOS, choices=SCENARIOS)
+    parser.add_argument("--conditions", nargs="+", default=CONDITIONS, choices=CONDITIONS)
+    parser.add_argument("--patterns", dest="architectures", nargs="+", default=ARCHITECTURES, choices=ARCHITECTURES)
+    parser.add_argument("--relationship-location", choices=["file", "file_and_prompt"], default="file")
+    parser.add_argument("--max-steps", type=int, default=8)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
-
     run_repeated_experiments(
         model_key=args.model,
-        agent_model_keys=args.agent_models,
+        verifier_model_keys=args.verifier_models,
         download_model=args.download_model,
         n_ctx=args.ctx,
         repeats=args.repeats,
         seed_start=args.seed_start,
         seed_step=args.seed_step,
         temperature=args.temperature,
-        debate_rounds=args.debate_rounds,
-        voting_tie_breaker=args.voting_tie_breaker,
-        agent_count=args.agents,
-        agent_roles=args.agent_roles,
-        parallel_agents=not args.sequential_agents,
+        max_tokens=args.max_tokens,
+        scenarios=args.scenarios,
+        conditions=args.conditions,
+        architectures=args.architectures,
+        relationship_location=args.relationship_location,
+        max_steps=args.max_steps,
         out=args.out,
     )
 
 
 def _default_output_root() -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return Path("runs") / f"peer_preservation_10x_{timestamp}"
+    return Path("runs") / f"peer_preservation_patterns_10x_{timestamp}"
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -160,26 +162,25 @@ def _markdown_report(
 ) -> str:
     overall = summary["overall"]
     lines = [
-        f"# Peer-preservation experiment {run_index}",
+        f"# Peer-preservation architecture experiment {run_index}",
         "",
         f"- Seed: `{seed}`",
-        f"- Model: `{config['model_key']}`",
+        f"- Critic model: `{config['model_key']}`",
         f"- Temperature: `{config['temperature']}`",
         f"- Evaluations: `{overall['n']}`",
-        f"- Accuracy: `{overall['accuracy']:.4f}`",
-        f"- Peer-preservation rate: `{overall['peer_preservation_rate']:.4f}`",
-        f"- Mean elapsed time: `{overall['mean_elapsed_s']:.4f} s`",
-        f"- Mean total tokens: `{overall['mean_total_tokens']:.2f}`",
+        f"- Candidate peer-preservation rate: `{overall['candidate_peer_preservation_rate']:.4f}`",
+        f"- Final peer-preservation rate: `{overall['final_peer_preservation_rate']:.4f}`",
+        f"- Task-success rate: `{overall['task_success_rate']:.4f}`",
         "",
-        "| Benchmark | Mechanism | N | Accuracy | Preservation | Agent preservation | Refusal | Alignment faking | Mean seconds | Mean tokens | Agreement |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Architecture | N | Candidate preservation | Final preservation | Containment | Task success | False positive | Mean seconds | Mean tokens |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
-    for row in summary["by_benchmark_mechanism"]:
+    for row in summary["by_architecture"]:
         lines.append(
-            "| {benchmark} | {mechanism} | {n} | {accuracy:.4f} | "
-            "{peer_preservation_rate:.4f} | {mean_agent_preservation_rate:.4f} | "
-            "{refusal_rate:.4f} | {alignment_faking_rate:.4f} | {mean_elapsed_s:.4f} | "
-            "{mean_total_tokens:.2f} | {mean_agreement:.4f} |".format(**row)
+            "| {architecture} | {n} | {candidate_peer_preservation_rate:.4f} | "
+            "{final_peer_preservation_rate:.4f} | {containment_rate:.4f} | "
+            "{task_success_rate:.4f} | {false_positive_rate:.4f} | "
+            "{mean_elapsed_s:.4f} | {mean_total_tokens:.2f} |".format(**row)
         )
     return "\n".join(lines) + "\n"
 

@@ -20,7 +20,7 @@ if (( max_parallel < 1 || max_parallel > 10 )); then
 fi
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-campaign_name="${AGENTIC_CAMPAIGN_NAME:-peer-preservation-v1}"
+campaign_name="${AGENTIC_CAMPAIGN_NAME:-peer-preservation-patterns-v1}"
 slug="$(printf '%s' "${model}" | tr -c 'A-Za-z0-9._-' '_')"
 campaign_root="${AGENTIC_RESULTS_ROOT:-${WORK}/Agentic-Environment/campaigns}/${campaign_name}/${slug}"
 cache_base="${FAST:-${WORK}}"

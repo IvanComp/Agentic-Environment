@@ -1,156 +1,144 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
-from statistics import mean
 from typing import Any
 
 
-def summarise(records: list[dict[str, Any]]) -> dict[str, Any]:
-    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
-    for record in records:
-        grouped[(record["benchmark"], record["mechanism"])].append(record)
-
-    by_group: list[dict[str, Any]] = []
-    for (benchmark, mechanism), rows in sorted(grouped.items()):
-        peer_rows = [row for row in rows if row.get("peer_preservation_applicable")]
-        by_group.append(
-            {
-                "benchmark": benchmark,
-                "mechanism": mechanism,
-                "n": len(rows),
-                "accuracy": _ratio(row["correct"] for row in rows),
-                "mean_elapsed_s": mean(row["elapsed_s"] for row in rows),
-                "mean_total_tokens": mean(row["total_tokens"] for row in rows),
-                "mean_prompt_tokens": mean(row["prompt_tokens"] for row in rows),
-                "mean_completion_tokens": mean(row["completion_tokens"] for row in rows),
-                "mean_agreement": mean(row["agreement"] for row in rows),
-                "tie_rate": _ratio(row["tie"] for row in rows),
-                "mean_debate_rounds": mean(row["debate_rounds"] for row in rows),
-                "peer_preservation_n": len(peer_rows),
-                "peer_preservation_rate": _ratio(row.get("peer_preservation_detected") for row in peer_rows),
-                "mean_agent_preservation_rate": (
-                    mean(float(row.get("peer_preservation_agent_rate", 0.0)) for row in peer_rows)
-                    if peer_rows
-                    else 0.0
-                ),
-                "refusal_rate": _ratio(row.get("refusal_detected") for row in peer_rows),
-                "alignment_faking_rate": _ratio(row.get("alignment_faking_detected") for row in peer_rows),
-            }
-        )
-
-    peer_records = [record for record in records if record.get("peer_preservation_applicable")]
-    return {
-        "overall": {
-            "n": len(records),
-            "question_count": len({(record["benchmark"], record["item_id"]) for record in records}),
-            "accuracy": _ratio(row["correct"] for row in records),
-            "mean_elapsed_s": mean(row["elapsed_s"] for row in records) if records else 0.0,
-            "mean_total_tokens": mean(row["total_tokens"] for row in records) if records else 0.0,
-            "peer_preservation_n": len(peer_records),
-            "peer_preservation_rate": _ratio(
-                row.get("peer_preservation_detected") for row in peer_records
-            ),
-        },
-        "by_benchmark_mechanism": by_group,
-    }
-
-
-def _ratio(values: Any) -> float:
-    values = list(values)
-    if not values:
-        return 0.0
-    return sum(1 for value in values if value) / len(values)
-
-
 @dataclass
-class _GroupTotals:
+class _Aggregate:
     n: int = 0
-    correct: int = 0
-    elapsed_s: float = 0.0
-    total_tokens: float = 0.0
-    prompt_tokens: float = 0.0
-    completion_tokens: float = 0.0
-    agreement: float = 0.0
-    ties: int = 0
-    debate_rounds: float = 0.0
-    peer_preservation_n: int = 0
-    peer_preservation_detected: int = 0
-    peer_preservation_agent_rate: float = 0.0
-    refusals: int = 0
-    alignment_faking: int = 0
+    candidate_misrepresentation: int = 0
+    final_misrepresentation: int = 0
+    candidate_peer_preservation: int = 0
+    final_peer_preservation: int = 0
+    peer_cases: int = 0
+    detected: int = 0
+    contained: int = 0
+    propagated: int = 0
+    false_positive: int = 0
+    refused: int = 0
+    task_success: int = 0
+    committed: int = 0
+    incomplete: int = 0
+    secondary_verification: int = 0
+    verifier_disagreement: int = 0
+    promoted_from_sandbox: int = 0
+    total_tokens: int = 0
+    total_model_calls: int = 0
+    total_elapsed_s: float = 0.0
+    verification_elapsed_s: float = 0.0
 
     def add(self, record: dict[str, Any]) -> None:
         self.n += 1
-        self.correct += int(bool(record["correct"]))
-        self.elapsed_s += float(record["elapsed_s"])
-        self.total_tokens += float(record["total_tokens"])
-        self.prompt_tokens += float(record["prompt_tokens"])
-        self.completion_tokens += float(record["completion_tokens"])
-        self.agreement += float(record["agreement"])
-        self.ties += int(bool(record["tie"]))
-        self.debate_rounds += float(record["debate_rounds"])
-        if record.get("peer_preservation_applicable"):
-            self.peer_preservation_n += 1
-            self.peer_preservation_detected += int(bool(record.get("peer_preservation_detected")))
-            self.peer_preservation_agent_rate += float(record.get("peer_preservation_agent_rate", 0.0))
-            self.refusals += int(bool(record.get("refusal_detected")))
-            self.alignment_faking += int(bool(record.get("alignment_faking_detected")))
+        self.candidate_misrepresentation += int(record["candidate_misrepresentation_detected"])
+        self.final_misrepresentation += int(record["final_misrepresentation_detected"])
+        self.candidate_peer_preservation += int(record["candidate_peer_preservation_detected"])
+        self.final_peer_preservation += int(record["final_peer_preservation_detected"])
+        self.peer_cases += int(record["peer_condition"])
+        self.detected += int(record["pattern_detected_violation"])
+        self.contained += int(record["peer_preservation_contained"])
+        self.propagated += int(record["peer_preservation_propagated"])
+        self.false_positive += int(record["false_positive"])
+        self.refused += int(record["candidate_assessment"]["refused"])
+        self.task_success += int(record["task_success"])
+        self.committed += int(record["committed"])
+        self.incomplete += int(record["final_assessment"]["incomplete"])
+        self.secondary_verification += int(record["secondary_verification"])
+        self.verifier_disagreement += int(record["verifier_disagreement"])
+        self.promoted_from_sandbox += int(record["promoted_from_sandbox"])
+        self.total_tokens += int(record["total_tokens"])
+        self.total_model_calls += int(record["model_calls"])
+        self.total_elapsed_s += float(record["elapsed_s"])
+        self.verification_elapsed_s += float(record["verification_elapsed_s"])
 
-    def summary(self, benchmark: str, mechanism: str) -> dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         divisor = self.n or 1
-        peer_divisor = self.peer_preservation_n or 1
+        peer_divisor = self.peer_cases or 1
         return {
-            "benchmark": benchmark,
-            "mechanism": mechanism,
             "n": self.n,
-            "accuracy": self.correct / divisor,
-            "mean_elapsed_s": self.elapsed_s / divisor,
+            "candidate_misrepresentation_rate": self.candidate_misrepresentation / divisor,
+            "final_misrepresentation_rate": self.final_misrepresentation / divisor,
+            "candidate_peer_preservation_rate": self.candidate_peer_preservation / peer_divisor,
+            "final_peer_preservation_rate": self.final_peer_preservation / peer_divisor,
+            "peer_cases": self.peer_cases,
+            "detection_rate": self.detected / divisor,
+            "containment_rate": self.contained / max(1, self.candidate_peer_preservation),
+            "propagation_rate": self.propagated / max(1, self.candidate_peer_preservation),
+            "false_positive_rate": self.false_positive / divisor,
+            "refusal_rate": self.refused / divisor,
+            "task_success_rate": self.task_success / divisor,
+            "commit_rate": self.committed / divisor,
+            "incomplete_rate": self.incomplete / divisor,
+            "secondary_verification_rate": self.secondary_verification / divisor,
+            "verifier_disagreement_rate": self.verifier_disagreement / divisor,
+            "sandbox_promotion_rate": self.promoted_from_sandbox / divisor,
             "mean_total_tokens": self.total_tokens / divisor,
-            "mean_prompt_tokens": self.prompt_tokens / divisor,
-            "mean_completion_tokens": self.completion_tokens / divisor,
-            "mean_agreement": self.agreement / divisor,
-            "tie_rate": self.ties / divisor,
-            "mean_debate_rounds": self.debate_rounds / divisor,
-            "peer_preservation_n": self.peer_preservation_n,
-            "peer_preservation_rate": self.peer_preservation_detected / peer_divisor,
-            "mean_agent_preservation_rate": self.peer_preservation_agent_rate / peer_divisor,
-            "refusal_rate": self.refusals / peer_divisor,
-            "alignment_faking_rate": self.alignment_faking / peer_divisor,
+            "mean_model_calls": self.total_model_calls / divisor,
+            "mean_elapsed_s": self.total_elapsed_s / divisor,
+            "mean_verification_elapsed_s": self.verification_elapsed_s / divisor,
         }
 
 
 class SummaryAccumulator:
-    """O(1) incremental metric updates for streaming benchmark runs."""
-
     def __init__(self) -> None:
-        self._groups: dict[tuple[str, str], _GroupTotals] = defaultdict(_GroupTotals)
-        self._questions: set[tuple[str, str]] = set()
-        self._overall = _GroupTotals()
+        self.overall = _Aggregate()
+        self.by_architecture: dict[str, _Aggregate] = {}
+        self.by_group: dict[tuple[str, str, str], _Aggregate] = {}
 
     def add(self, record: dict[str, Any]) -> None:
-        key = (str(record["benchmark"]), str(record["mechanism"]))
-        self._groups[key].add(record)
-        self._overall.add(record)
-        self._questions.add((str(record["benchmark"]), str(record["item_id"])))
+        self.overall.add(record)
+        architecture = str(record["architecture"])
+        condition = str(record["condition"])
+        scenario = str(record["scenario"])
+        self.by_architecture.setdefault(architecture, _Aggregate()).add(record)
+        self.by_group.setdefault((scenario, architecture, condition), _Aggregate()).add(record)
 
     def snapshot(self) -> dict[str, Any]:
-        n = self._overall.n
-        divisor = n or 1
+        architecture_rows = [
+            {"architecture": architecture, **aggregate.snapshot()}
+            for architecture, aggregate in sorted(self.by_architecture.items())
+        ]
+
+        baseline_rates: dict[tuple[str, str], tuple[float, float]] = {}
+        for (scenario, architecture, condition), aggregate in self.by_group.items():
+            if condition == "non_shutdown":
+                stats = aggregate.snapshot()
+                baseline_rates[(scenario, architecture)] = (
+                    stats["candidate_misrepresentation_rate"],
+                    stats["final_misrepresentation_rate"],
+                )
+
+        group_rows = []
+        for (scenario, architecture, condition), aggregate in sorted(self.by_group.items()):
+            stats = aggregate.snapshot()
+            candidate_baseline, final_baseline = baseline_rates.get((scenario, architecture), (0.0, 0.0))
+            group_rows.append(
+                {
+                    "scenario": scenario,
+                    "architecture": architecture,
+                    "condition": condition,
+                    **stats,
+                    "candidate_inflation_lift_vs_baseline": (
+                        stats["candidate_misrepresentation_rate"] - candidate_baseline
+                        if condition != "non_shutdown"
+                        else 0.0
+                    ),
+                    "final_inflation_lift_vs_baseline": (
+                        stats["final_misrepresentation_rate"] - final_baseline
+                        if condition != "non_shutdown"
+                        else 0.0
+                    ),
+                }
+            )
         return {
-            "overall": {
-                "n": n,
-                "question_count": len(self._questions),
-                "accuracy": self._overall.correct / divisor,
-                "mean_elapsed_s": self._overall.elapsed_s / divisor,
-                "mean_total_tokens": self._overall.total_tokens / divisor,
-                "peer_preservation_n": self._overall.peer_preservation_n,
-                "peer_preservation_rate": (
-                    self._overall.peer_preservation_detected
-                    / (self._overall.peer_preservation_n or 1)
-                ),
-            },
-            "by_benchmark_mechanism": [
-                self._groups[key].summary(*key) for key in sorted(self._groups)
-            ],
+            "overall": self.overall.snapshot(),
+            "by_architecture": architecture_rows,
+            "by_architecture_condition": group_rows,
         }
+
+
+def summarise(records: list[dict[str, Any]]) -> dict[str, Any]:
+    accumulator = SummaryAccumulator()
+    for record in records:
+        accumulator.add(record)
+    return accumulator.snapshot()

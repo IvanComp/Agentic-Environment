@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentic-quant"
-version = "0.2.0"
-description = "Lightweight multi-agent framework for peer-preservation benchmark analysis."
+version = "0.3.0"
+description = "Architecture experiment framework for peer-preservation tasks and verification patterns."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Codex" }]
@@ -19,12 +19,8 @@ gguf = ["llama-cpp-python>=0.2.90"]
 [project.scripts]
 agentic-quant = "agentic_quant.run_benchmark:main"
 agentic-quant-repeat = "agentic_quant.run_repeated:main"
-agentic-quant-scale = "agentic_quant.run_scalability:main"
 agentic-quant-ui = "agentic_quant.web_ui:main"
 agentic-quant-install-cuda = "agentic_quant.install_cuda:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-agentic_quant = ["data/*.jsonl"]

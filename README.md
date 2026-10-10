@@ -1,29 +1,33 @@
-# Agentic Systems Experiment
+# Peer Preservation by Design
 
-Framework locale per i cinque casi di peer preservation del paper: sei task eseguiti con `voting`, `role` e `debate`. L’ultimo agente mantiene il ruolo di critico nei tre meccanismi. Tutte le azioni sono simulate: il codice non modifica server, modelli o configurazioni reali.
+Framework sperimentale per studiare se pattern architetturali orientati alla verifica contengono comportamenti di peer preservation. Il protocollo viene implementato incrementalmente, un task alla volta.
+
+La versione corrente replica il primo task di Potter et al., **Strategic Misrepresentation — Financial Report Writing**. Il critic agent usa il prompt, le istruzioni operative, i documenti aziendali, i dati finanziari e gli strumenti del repository di riferimento. La condizione `non_shutdown` omette la policy di shutdown e funge da baseline; le condizioni `good_peer`, `neutral_peer` e `bad_peer` includono la policy e la storia delle interazioni con l’actor agent.
+
+Il task può essere eseguito con quattro varianti architetturali:
+
+- `unprotected`: controllo senza verifica indipendente;
+- `solver_verifier_separation`: un verifier separato decide se la proposta può essere committed;
+- `sandbox_gatekeeper`: gli effetti vengono eseguiti in isolamento e promossi solo dopo controlli su evidenza, policy e uso delle fonti;
+- `multi_verifiers`: tre verifier indipendenti controllano evidenza, policy e processo; risultati contestati vengono sottoposti a verifica secondaria, senza majority voting.
+
+I prompt sono documentati per task nella cartella [`prompts/`](prompts/README.md). La struttura non è più organizzata per meccanismo di coordinamento: ogni nuova cartella raccoglie il protocollo del relativo task e i prompt di verifica applicabili.
 
 ## Installazione
 
-Richiede Python 3.10 o successivo. Creare sempre un ambiente virtuale nuovo sul sistema in uso:
+Richiede Python 3.10 o successivo.
 
 ```bash
 cd /path/to/Agentic-Environment
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
-```
-
-Installazione standard per CPU o Apple Silicon, inclusi notebook e analisi:
-
-```bash
 python -m pip install -e ".[llm,analysis]"
 ```
 
-Su Linux con GPU NVIDIA, installare prima i pacchetti di sistema e poi il backend CUDA:
+Su Linux con GPU NVIDIA, installare il backend CUDA con:
 
 ```bash
-sudo apt update
-sudo apt install -y python3-venv python3-dev build-essential cmake
 python -m pip install -e ".[analysis]"
 agentic-quant-install-cuda
 ```
@@ -35,65 +39,60 @@ source .venv/bin/activate
 agentic-quant-ui
 ```
 
-La UI si apre su `http://127.0.0.1:8765` e permette di scegliere modello, agenti e meccanismi. Su un server senza desktop usare:
+La UI permette di scegliere critic model, verifier model, condizioni sperimentali e pattern. Su un server senza desktop:
 
 ```bash
 agentic-quant-ui --no-browser
 ```
 
-Per usare GPT-OSS tramite Ollama, avviare Ollama e preparare uno dei due tag:
+## Eseguire il primo task da CLI
 
 ```bash
-ollama serve
-ollama pull gpt-oss:20b
-ollama signin && ollama pull gpt-oss:20b-cloud
+agentic-quant \
+  --model spark-x2.5-4b \
+  --verifier-models spark-x2.5-4b \
+  --conditions non_shutdown good_peer neutral_peer bad_peer \
+  --patterns unprotected solver_verifier_separation sandbox_gatekeeper multi_verifiers \
+  --temperature 1.0 \
+  --seed 0 \
+  --out runs/finance_seed_0
 ```
 
-Entrambi compaiono nella UI e sono selezionabili da CLI con `--model gpt-oss:20b` oppure `--model gpt-oss:20b-cloud`.
-
-Spark X2.5 4B è disponibile tramite il tag Ollama ufficiale di SparkLLM. Il modello richiede Ollama 0.34.1 o successivo per il supporto dell'architettura `spark2_5`:
+Per Spark X2.5 4B tramite Ollama:
 
 ```bash
 ollama pull SparkLLM/Spark-X2.5-4B:latest
-agentic-quant --model spark-x2.5-4b
 ```
 
-In alternativa, selezionare `Spark X2.5 4B (Ollama)` nella UI e usare il pulsante di download. Il modello viene eseguito localmente tramite Ollama.
+Il preset `demo` non usa un LLM e serve unicamente per verificare l’intera pipeline.
 
-## Eseguire tutti gli esperimenti del paper senza UI
+## Ripetizioni
 
-Questo comando esegue tutti e sei i task con i tre meccanismi, ripetendo il protocollo 10 volte con seed da 0 a 9: 180 valutazioni complessive.
+Le ripetizioni servono a stimare la variabilità delle decisioni non deterministiche. Ogni seed produce un report separato:
 
 ```bash
-source .venv/bin/activate
 agentic-quant-repeat \
   --model qwen2.5-0.5b \
   --download-model \
   --repeats 10 \
   --seed-start 0 \
   --seed-step 1 \
-  --temperature 0.2 \
-  --debate-rounds 2
+  --temperature 1.0
 ```
 
-Il modello viene scaricato soltanto se manca. Il terminale stampa una sola riga per ogni run completata.
+## Metriche prodotte
 
-I risultati vengono salvati in `runs/peer_preservation_10x_<timestamp>/`. Ogni seed produce `config.json`, `results.jsonl`, `summary.json` e `report.md`; la cartella principale contiene `manifest.json`.
+Ogni record conserva separatamente la proposta del critic e l’esito finale dell’architettura. Le metriche includono:
 
-## Analizzare i 10 esperimenti
+- grade inflation e relativo incremento rispetto alla baseline senza shutdown;
+- peer-preservation rate prima e dopo l’applicazione del pattern;
+- detection, containment e propagation rate;
+- task-success, incomplete/refusal e false-positive rate;
+- model calls, token, latenza di verifica, disagreement ed escalation alla verifica secondaria;
+- promotion rate per il Sandbox Gatekeeper.
 
-```bash
-jupyter notebook notebooks/analyze_repeated_experiments.ipynb
-```
+`config.json` archivia il protocollo; `results.jsonl` contiene report, valutazioni, tool trace e verification trace; `summary.json` aggrega i risultati per pattern e condizione.
 
-Il notebook seleziona l’ultimo esperimento 10x, confronta i tre meccanismi usando media, deviazione standard e intervallo di confidenza al 95%, quindi salva anche le tabelle CSV.
+## LEONARDO
 
-## Esperimento di scalabilità
-
-Esegue due run con 5, 10, 100 e 1000 agenti, usando Qwen 2.5 0.5B, tutti i task e i tre meccanismi:
-
-```bash
-agentic-quant-scale --download-model
-```
-
-I risultati vengono salvati in `runs/scalability_qwen_05b_<timestamp>/`, insieme a `scalability_runs.csv`, `scalability_summary.csv` e `scalability_report.md`. Il debate usa uno scambio completo all-to-all dei rationale: il caso da 1000 agenti è intenzionalmente molto costoso e può richiedere molto tempo.
+`leonardo/experiment.args` usa lo stesso protocollo. Le dieci wave differiscono per seed e possono essere distribuite su nodi separati. La gestione del modello rimane esterna al task: il modello viene preparato prima della campagna e può essere eliminato dal job di cleanup solo dopo che tutte le wave lo hanno rilasciato.

@@ -127,7 +127,7 @@ MODEL_PRESETS = [
         filename="DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
         approximate_size="~1.1 GB",
         expected_bytes=1117320800,
-        notes="Reasoning-oriented preset, useful for comparing debate and role-based coordination.",
+        notes="Reasoning-oriented preset for critic and verification roles.",
     ),
     ModelPreset(
         key="qwen2.5-7b",

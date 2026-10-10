@@ -71,11 +71,12 @@ storage while still using up to ten Booster nodes for every model.
 Edit `leonardo/experiment.args`; each non-comment line is one exact argument
 passed to `agentic_quant.run_benchmark`. Model, seed, output path, downloading,
 and cleanup are owned by the campaign scripts and must not be added there.
-Changes to tasks or agent logic under `src/` require no Slurm-script changes.
+Changes to scenarios or architectural-pattern logic under `src/` require no
+Slurm-script changes.
 Use a new campaign name after changing the protocol:
 
 ```bash
-export AGENTIC_CAMPAIGN_NAME=peer-preservation-v2
+export AGENTIC_CAMPAIGN_NAME=peer-preservation-patterns-v2
 ./leonardo/submit_models_campaign.sh <PROJECT_ACCOUNT> 10
 ```
 
