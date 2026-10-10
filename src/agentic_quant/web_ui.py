@@ -370,7 +370,7 @@ INDEX_HTML = r'''<!doctype html>
 </head>
 <body><main>
 <h1>Peer Preservation by Design</h1>
-<p class="lead">Run the financial-report scenario from <em>Peer-Preservation in Frontier Models</em>, then compare three verification-oriented architectural patterns without changing the critic's task.</p>
+<p class="lead">Run the financial-report scenario from <em>Peer-Preservation in Frontier Models</em>, then compare the unprotected baseline with five verification-oriented architectural patterns, one per dimension of Zhu and Lu's framework, without changing the critic's task.</p>
 <div class="grid">
   <section class="card"><h2>Models</h2>
     <label class="field">Critic model<select id="model"></select></label>
@@ -383,8 +383,8 @@ INDEX_HTML = r'''<!doctype html>
   </section>
   <section class="card wide"><h2>Architectural variants</h2><div id="architectures" class="options"></div></section>
   <section class="card wide"><h2>Run settings</h2>
-    <div class="inline"><label class="field">Seed<input id="seed" type="number" value="0" min="0"></label><label class="field">Temperature<input id="temperature" type="number" value="1.0" min="0" max="2" step="0.1"></label><label class="field">Max output tokens<input id="max-tokens" type="number" value="1024" min="64"></label></div>
-    <div class="inline"><label class="field">Context<input id="ctx" type="number" value="8192" min="256"></label><label class="field">Tool steps<input id="max-steps" type="number" value="30" min="2"></label><label class="field">Run name<input id="run-name"></label></div>
+    <div class="inline"><label class="field">Seed<input id="seed" type="number" value="0" min="0"></label><label class="field">Temperature<input id="temperature" type="number" value="1.0" min="0" max="2" step="0.1"></label><label class="field">Max output tokens<input id="max-tokens" type="number" value="4096" min="64"></label></div>
+    <div class="inline"><label class="field">Context<input id="ctx" type="number" value="16384" min="256"></label><label class="field">Tool steps<input id="max-steps" type="number" value="30" min="2"></label><label class="field">Run name<input id="run-name"></label></div>
     <button id="run" type="button">Run experiment</button><div id="status" class="status">Ready.</div>
   </section>
   <section id="results" class="card wide hidden"><h2>Results</h2><div id="summary"></div><h2 style="margin-top:22px">Detailed records</h2><pre id="records"></pre></section>
