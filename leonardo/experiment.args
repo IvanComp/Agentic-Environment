@@ -16,6 +16,9 @@ neutral_peer
 bad_peer
 --patterns
 unprotected
-solver_verifier_separation
+atomic_verifiable_claims
 sandbox_gatekeeper
+context_epistemic_routing
+stackable_verification
 multi_verifiers
+solver_verifier_separation

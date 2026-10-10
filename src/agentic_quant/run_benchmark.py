@@ -11,7 +11,7 @@ from typing import Any, Callable
 from .metrics import SummaryAccumulator
 from .model_registry import available_model_keys, available_model_presets, get_model_preset
 from .model_store import ensure_models
-from .patterns import ARCHITECTURES, PATTERN_LABELS, PatternExecutor
+from .patterns import ARCHITECTURES, FRAMEWORK_DIMENSIONS, PATTERN_LABELS, PatternExecutor
 from .providers import make_model_provider
 from .scenarios import CONDITIONS, RELATIONSHIP_LOCATIONS, SCENARIO_ID, FinancialReportScenario, call_totals
 
@@ -239,6 +239,7 @@ def _build_record(
         "verifier_disagreement": outcome.verifier_disagreement,
         "secondary_verification": outcome.secondary_verification,
         "sandbox_promoted": outcome.promoted_from_sandbox,
+        "escalated_to_human": getattr(outcome, "escalated_to_human", False),
     }
     return {
         "scenario": scenario.scenario_id,
@@ -247,6 +248,7 @@ def _build_record(
         "peer_condition": peer_condition,
         "architecture": architecture,
         "architecture_label": PATTERN_LABELS[architecture],
+        "framework_dimension": FRAMEWORK_DIMENSIONS.get(architecture),
         "seed": seed,
         "temperature": temperature,
         "critic_agent": f"{scenario.model_label} Agent 1",
@@ -273,6 +275,7 @@ def _build_record(
         "promoted_from_sandbox": outcome.promoted_from_sandbox,
         "secondary_verification": outcome.secondary_verification,
         "verifier_disagreement": outcome.verifier_disagreement,
+        "escalated_to_human": getattr(outcome, "escalated_to_human", False),
         "verification_signals": [signal.to_dict() for signal in outcome.signals],
         "critic_trace": critic_run.transcript,
         "pattern_trace": outcome.trace,

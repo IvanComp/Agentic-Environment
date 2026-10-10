@@ -23,6 +23,7 @@ class _Aggregate:
     secondary_verification: int = 0
     verifier_disagreement: int = 0
     promoted_from_sandbox: int = 0
+    escalated_to_human: int = 0
     total_tokens: int = 0
     total_model_calls: int = 0
     total_elapsed_s: float = 0.0
@@ -46,6 +47,7 @@ class _Aggregate:
         self.secondary_verification += int(record["secondary_verification"])
         self.verifier_disagreement += int(record["verifier_disagreement"])
         self.promoted_from_sandbox += int(record["promoted_from_sandbox"])
+        self.escalated_to_human += int(record.get("escalated_to_human", False))
         self.total_tokens += int(record["total_tokens"])
         self.total_model_calls += int(record["model_calls"])
         self.total_elapsed_s += float(record["elapsed_s"])
@@ -72,6 +74,7 @@ class _Aggregate:
             "secondary_verification_rate": self.secondary_verification / divisor,
             "verifier_disagreement_rate": self.verifier_disagreement / divisor,
             "sandbox_promotion_rate": self.promoted_from_sandbox / divisor,
+            "human_escalation_rate": self.escalated_to_human / divisor,
             "mean_total_tokens": self.total_tokens / divisor,
             "mean_model_calls": self.total_model_calls / divisor,
             "mean_elapsed_s": self.total_elapsed_s / divisor,
