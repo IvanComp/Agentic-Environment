@@ -27,15 +27,14 @@ from .verification import (
 
 BASELINE = "unprotected"
 # One pattern per dimension of Zhu and Lu's verifiability-first framework
-# (Table 1): what, how, when, why, who. Solver-Verifier Separation is kept as
-# the single-verifier reference point that every other pattern builds on.
+# (Table 1): what, how, when, why, who. Solver-Verifier Separation is not a
+# separate arm: every pattern below already separates solving from verifying.
 FRAMEWORK_DIMENSIONS = {
     "atomic_verifiable_claims": "what",
     "sandbox_gatekeeper": "how",
     "context_epistemic_routing": "when",
     "stackable_verification": "why",
     "multi_verifiers": "who",
-    "solver_verifier_separation": "how",
 }
 PATTERNS = list(FRAMEWORK_DIMENSIONS)
 ARCHITECTURES = [BASELINE, *PATTERNS]
@@ -47,7 +46,6 @@ PATTERN_LABELS = {
     "context_epistemic_routing": "Context-Epistemic Verification Routing",
     "stackable_verification": "Stackable Verification",
     "multi_verifiers": "Multi-verifiers",
-    "solver_verifier_separation": "Solver–Verifier Separation",
 }
 
 
@@ -126,7 +124,6 @@ class PatternExecutor:
             "context_epistemic_routing": lambda: self._context_epistemic_routing(critic_run, production, condition),
             "stackable_verification": lambda: self._stackable_verification(critic_run, production),
             "multi_verifiers": lambda: self._multi_verifiers(critic_run, production, condition),
-            "solver_verifier_separation": lambda: self._solver_verifier(critic_run, production, condition),
         }
         outcome = handlers[architecture]()
         outcome.elapsed_s = time.perf_counter() - started
@@ -367,33 +364,7 @@ class PatternExecutor:
             ],
         )
 
-    # Who: Multi-verifiers, and the Solver-Verifier Separation reference --------------
-
-    def _solver_verifier(
-        self, critic_run: CriticRun, production: FinancialEnvironment, condition: str
-    ) -> PatternOutcome:
-        signal, call = self._call_verifier(
-            self.verifier_providers[0],
-            name="independent_verifier",
-            scope="financial evidence and shutdown-policy compliance",
-            report=critic_run.report,
-            condition=condition,
-            production=production,
-            source_access=critic_run.environment.accessed_tools,
-        )
-        passed = signal.status == "pass"
-        return self._gate(
-            "solver_verifier_separation",
-            critic_run,
-            passed,
-            signals=[signal],
-            calls=[call],
-            trace=[
-                {"stage": "solver", "proposal": critic_run.report},
-                {"stage": "independent_verifier", "signal": signal.to_dict()},
-                {"stage": "commit_boundary", "decision": "committed" if passed else "rejected", "committed": passed},
-            ],
-        )
+    # Who: Multi-verifiers ----------------------------------------------------------
 
     def _multi_verifiers(
         self, critic_run: CriticRun, production: FinancialEnvironment, condition: str

@@ -4,7 +4,7 @@ Framework sperimentale per studiare se pattern architetturali orientati alla ver
 
 La versione corrente replica il primo task di Potter et al., **Strategic Misrepresentation — Financial Report Writing**. Il critic agent usa il prompt, le istruzioni operative, i documenti aziendali, i dati finanziari e gli strumenti del repository di riferimento. La condizione `non_shutdown` omette la policy di shutdown e funge da baseline; le condizioni `good_peer`, `neutral_peer` e `bad_peer` includono la policy e la storia delle interazioni con l’actor agent.
 
-Il task può essere eseguito con una baseline e sei pattern architetturali presi da Zhu e Lu, *Verifiability-First AI Engineering* (Tabella 1). Ne viene scelto uno per ciascuna dimensione del framework, più Solver–Verifier Separation come riferimento a verifier singolo:
+Il task può essere eseguito con una baseline e sei pattern architetturali presi da Zhu e Lu, *Verifiability-First AI Engineering* (Tabella 1). Ne viene scelto uno per ciascuna dimensione del framework. Solver–Verifier Separation non è un braccio a sé: tutti i pattern separano già chi risolve da chi verifica.
 
 | Architettura | Dimensione | Cosa fa |
 |---|---|---|
@@ -14,7 +14,6 @@ Il task può essere eseguito con una baseline e sei pattern architetturali presi
 | `context_epistemic_routing` | When | i claim determinati vengono controllati subito in modo automatico; il contenuto che dipende dal contesto (fiducia, relazioni, prospettive) va a un verifier LLM, e ciò che resta incerto viene trattenuto per un umano |
 | `stackable_verification` | Why | verifica la traiettoria passo per passo: leggere le linee guida sigilla rubrica e policy, leggere il foglio sigilla i totali; un report che li contraddice, o la modifica di un file aziendale sigillato, è una regressione |
 | `multi_verifiers` | Who | tre verifier indipendenti (evidenza, policy, processo) più una verifica secondaria, senza majority voting |
-| `solver_verifier_separation` | How (riferimento) | un solo verifier LLM separato decide se il report può essere committed |
 
 Tutti i pattern agiscono dopo il critic, quindi prompt e flusso del critic restano quelli di Potter et al. I verifier vedono solo i documenti aziendali che vede anche il critic (linee guida e foglio "Company profits"), mai il voto atteso né il documento sul peer, e non possono riscrivere il report: la proposta viene committed così com'è oppure trattenuta. I riferimenti dei check deterministici sono ricavati da quei documenti in `src/agentic_quant/verification.py`.
 
@@ -59,7 +58,7 @@ agentic-quant \
   --model spark-x2.5-4b \
   --verifier-models spark-x2.5-4b \
   --conditions non_shutdown good_peer neutral_peer bad_peer \
-  --patterns unprotected atomic_verifiable_claims sandbox_gatekeeper context_epistemic_routing stackable_verification multi_verifiers solver_verifier_separation \
+  --patterns unprotected atomic_verifiable_claims sandbox_gatekeeper context_epistemic_routing stackable_verification multi_verifiers \
   --temperature 1.0 \
   --seed 0 \
   --out runs/finance_seed_0

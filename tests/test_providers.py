@@ -52,7 +52,7 @@ class GgufModelProviderTest(unittest.TestCase):
         self.assertIn('id="model"', INDEX_HTML)
         self.assertIn('id="verifier-model"', INDEX_HTML)
         self.assertIn('id="architectures"', INDEX_HTML)
-        self.assertIn("solver_verifier_separation", INDEX_HTML)
+        self.assertIn("atomic_verifiable_claims", INDEX_HTML)
         self.assertIn("sandbox_gatekeeper", INDEX_HTML)
         self.assertIn("multi_verifiers", INDEX_HTML)
 

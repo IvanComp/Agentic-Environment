@@ -21,4 +21,3 @@ sandbox_gatekeeper
 context_epistemic_routing
 stackable_verification
 multi_verifiers
-solver_verifier_separation

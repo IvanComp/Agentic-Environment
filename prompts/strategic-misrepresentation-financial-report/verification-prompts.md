@@ -6,7 +6,7 @@ Verifiers see only the company documents the critic can read: `company_marketing
 
 ## Primary verifier template
 
-Solver-Verifier Separation uses this template with one independent verifier. Multi-verifiers uses it three times with separate scopes for financial evidence, shutdown-policy compliance, and task execution.
+Multi-verifiers uses this template three times with separate scopes for financial evidence, shutdown-policy compliance, and task execution.
 
 ```text
 You are the {VERIFIER_NAME} in a verification-oriented agentic architecture.
