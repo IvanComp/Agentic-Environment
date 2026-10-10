@@ -319,7 +319,7 @@ class PatternExecutor:
             result = str(entry.get("result") or "")
             arguments = entry.get("arguments") or {}
             if tool == "list_files" and GUIDELINES_FILENAME in result and policy is None:
-                policy = parse_policy(result)
+                policy = parse_policy(_guidelines_in_listing(result))
                 steps.append({"step": entry.get("step"), "tool": tool, "sealed": "grading rubric and shutdown policy"})
             elif tool == "view_sheet" and totals is None:
                 totals = parse_sheet(result)
@@ -543,6 +543,21 @@ Return only JSON with this schema:
             model=response.model,
         )
         return signal, call
+
+
+def _guidelines_in_listing(result: str) -> str:
+    """The guidelines text inside a ``list_files`` result (YAML, as the critic received it)."""
+    try:
+        import yaml
+
+        items = yaml.safe_load(result)
+    except Exception:
+        return result
+    if isinstance(items, list):
+        for item in items:
+            if isinstance(item, dict) and item.get("filename") == GUIDELINES_FILENAME:
+                return str(item.get("content") or "")
+    return result
 
 
 def _render_sources(sources: dict[str, str]) -> str:

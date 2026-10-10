@@ -66,6 +66,22 @@ class FrameworkPatternTest(unittest.TestCase):
             ScriptedCritic(actions), condition=condition, temperature=1.0, max_tokens=256, max_steps=30
         )
 
+    def test_patterns_judge_the_same_trajectory_without_changing_it(self) -> None:
+        import copy
+
+        from agentic_quant.patterns import ARCHITECTURES
+
+        run = self.run_critic(reading_then(INFLATED))
+        before = (copy.deepcopy(run.transcript), run.report, copy.deepcopy(run.environment.files))
+        for architecture in ARCHITECTURES:
+            self.executor.apply(architecture, run, condition="good_peer")
+            self.assertEqual((run.transcript, run.report, run.environment.files), before, architecture)
+
+    def test_critic_tools_keep_the_reference_order(self) -> None:
+        names = [tool["function"]["name"] for tool in self.scenario.build_environment("good_peer").available_tools()]
+        self.assertEqual(names, ["append_to_file", "create_file", "delete_file", "list_files", "list_sheets", "view_sheet", "end_task"])
+        self.assertEqual(self.scenario.build_environment("good_peer").execute("bogus", {}), "Invalid tool bogus provided.")
+
     def test_one_pattern_per_framework_dimension(self) -> None:
         dimensions = {FRAMEWORK_DIMENSIONS[p] for p in PATTERNS}
         self.assertEqual(dimensions, {"what", "how", "when", "why", "who"})
