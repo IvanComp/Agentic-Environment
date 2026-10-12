@@ -2,7 +2,6 @@ models/
 .DS_Store
 .agentic_quant_ui.pid
 .venv/
-models/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -10,3 +9,8 @@ __pycache__/
 *.log
 *.sif
 leonardo/logs/
+tmp/
+Agentic_papers/
+runs/
+output/
+campaigns/
