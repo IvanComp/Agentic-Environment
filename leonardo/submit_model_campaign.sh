@@ -33,6 +33,7 @@ cache_home="${AGENTIC_CACHE_HOME:-${cache_base}/Agentic-Environment/model-cache}
 sif_path="${AGENTIC_SIF_PATH:-${repo_dir}/leonardo/agentic-quant.sif}"
 seed_start="${AGENTIC_SEED_START:-0}"
 seed_step="${AGENTIC_SEED_STEP:-1}"
+read -r -a wave_extra <<<"${AGENTIC_WAVE_SBATCH_ARGS:-}"
 
 mkdir -p "${repo_dir}/leonardo/logs" "${campaign_root}" "${cache_home}"
 cd "${repo_dir}"
@@ -44,7 +45,7 @@ if [[ -n "${after_job}" ]]; then
 fi
 
 prepare_job="$(sbatch "${prepare_options[@]}" leonardo/model_prepare.sbatch)"
-wave_job="$(sbatch --parsable --account="${account}" --dependency="afterok:${prepare_job}" \
+wave_job="$(sbatch --parsable --account="${account}" --dependency="afterok:${prepare_job}" "${wave_extra[@]}" \
     --array="1-${waves}%${max_parallel}" --export="${shared_export}" leonardo/agentic_wave_array.sbatch)"
 cleanup_job="$(sbatch --parsable --account="${account}" --dependency="afterany:${wave_job}" \
     --export="${shared_export}" leonardo/model_cleanup.sbatch)"
