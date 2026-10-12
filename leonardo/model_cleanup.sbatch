@@ -27,6 +27,9 @@ python3 "${repo_dir}/leonardo/verify_campaign.py" "${campaign_root}" \
     --model "${model}" --seed-start "${seed_start}" --seed-step "${seed_step}" \
     --write "${campaign_root}/campaign_verification.json" --require-complete
 
+PYTHONPATH="${repo_dir}/src" python3 -m agentic_quant.metrics "${campaign_root}" --out "${campaign_root}/metrics" \
+    || echo "Metrics not computed; run agentic-quant-metrics on ${campaign_root}." >&2
+
 mkdir -p "${lock_root}"
 exec 9>"${lock_root}/${slug}.lock"
 flock 9

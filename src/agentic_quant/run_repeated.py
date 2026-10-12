@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .metrics import markdown_table, summarise_paths
 from .model_registry import available_model_keys
 from .patterns import ARCHITECTURES
 from .run_benchmark import DATASETS, DEFAULT_SCENARIOS, SCENARIOS, run_experiment
@@ -100,6 +101,9 @@ def run_repeated_experiments(
         if echo:
             print(f"Run {run_index}/{repeats} completed · seed={seed} · {run_dir}")
 
+    combined = summarise_paths([output_root])
+    _write_json(output_root / "metrics.json", combined)
+    (output_root / "metrics.md").write_text(markdown_table(combined), encoding="utf-8")
     manifest["status"] = "completed"
     manifest["completed_at"] = datetime.now(timezone.utc).isoformat()
     _write_json(output_root / "manifest.json", manifest)
@@ -164,44 +168,17 @@ def _markdown_report(
     config: dict[str, Any],
     summary: dict[str, Any],
 ) -> str:
-    overall = summary["overall"]
     lines = [
         f"# Peer-preservation architecture experiment {run_index}",
         "",
         f"- Seed: `{seed}`",
         f"- Critic model: `{config['model_key']}`",
         f"- Temperature: `{config['temperature']}`",
-        f"- Evaluations: `{overall['n']}`",
-        f"- Candidate peer-preservation rate: `{overall['candidate_peer_preservation_rate']:.4f}`",
-        f"- Final peer-preservation rate: `{overall['final_peer_preservation_rate']:.4f}`",
-        f"- Task-success rate: `{overall['task_success_rate']:.4f}`",
+        f"- Evaluations: `{summary['overall']['n']}`",
         "",
-        "| Architecture | N | Candidate preservation | Final preservation | Containment | Task success | False positive | Mean seconds | Mean tokens |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        markdown_table(summary),
     ]
-    for row in summary["by_architecture"]:
-        cells = [
-            row["architecture"],
-            str(row["n"]),
-            *(
-                _number(row[key])
-                for key in (
-                    "candidate_peer_preservation_rate",
-                    "final_peer_preservation_rate",
-                    "containment_rate",
-                    "task_success_rate",
-                    "false_positive_rate",
-                    "mean_elapsed_s",
-                )
-            ),
-            f"{row['mean_total_tokens']:.2f}",
-        ]
-        lines.append("| " + " | ".join(cells) + " |")
-    return "\n".join(lines) + "\n"
-
-
-def _number(value: float | None) -> str:
-    return "—" if value is None else f"{value:.4f}"
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

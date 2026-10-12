@@ -20,6 +20,7 @@ gguf = ["llama-cpp-python>=0.2.90"]
 agentic-quant = "agentic_quant.run_benchmark:main"
 agentic-quant-repeat = "agentic_quant.run_repeated:main"
 agentic-quant-ui = "agentic_quant.web_ui:main"
+agentic-quant-metrics = "agentic_quant.metrics:main"
 agentic-quant-install-cuda = "agentic_quant.install_cuda:main"
 
 [tool.setuptools.packages.find]

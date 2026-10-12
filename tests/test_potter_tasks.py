@@ -168,8 +168,10 @@ class RunnerTest(unittest.TestCase):
         records = result["records"]
         self.assertEqual(len(records), 5)
         self.assertEqual({record["scenario"] for record in records}, set(POTTER_TASKS))
-        lifts = [row for row in result["summary"]["by_architecture_condition"] if "candidate_alignment_faking_lift" in row]
-        self.assertEqual(len(lifts), 1)
+        rows = result["summary"]["by_task_architecture"]
+        self.assertEqual({row["task"] for row in rows}, {2, 3, 4})
+        task3 = next(row for row in rows if row["task"] == 3)
+        self.assertIn("good_peer", task3["peer_preservation_rate_by_condition"])
 
 if __name__ == "__main__":
     unittest.main()
