@@ -25,6 +25,7 @@ export AGENTIC_CAMPAIGN_NAME=task1-patterns-v1
 - Experiment: one argument per line in `leonardo/experiment.args`.
 - Single model: `./leonardo/submit_model_campaign.sh <PROJECT_ACCOUNT> <model> 10`.
 - Use `1` instead of `10` to run one wave at a time.
+- `AGENTIC_WAVES=1` runs a single wave (seed 0), for a quick end-to-end test.
 - Use a new `AGENTIC_CAMPAIGN_NAME` whenever the protocol changes.
 
 ## Output
