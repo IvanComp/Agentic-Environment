@@ -8,9 +8,11 @@ Runs one model at a time as ten waves (seeds 0-9). Each wave is one Slurm array 
 cd /path/to/Agentic-Environment
 git pull
 chmod +x leonardo/*.sh leonardo/*.py
-./leonardo/pull_sif_from_ghcr.sh
+sbatch --account=<PROJECT_ACCOUNT> --partition=lrd_all_serial --time=02:00:00 --mem=30G --cpus-per-task=4 --output=pull-sif.out --wrap="./leonardo/pull_sif_from_ghcr.sh"
 ./leonardo/check_setup.sh
 ```
+
+Run `check_setup.sh` once the job has finished. Clone the repo under `$WORK`, not `$HOME`. The image is built in a Slurm job because login and visualization nodes kill the SIF conversion; cache and temporary files go to `$WORK`.
 
 The image is built from `main` by `.github/workflows/build-leonardo-image.yml` and published at `ghcr.io/ivancomp/agentic-environment-leonardo`. The package must be public, or set `AGENTIC_IMAGE_URI` to an image the cluster can read.
 
