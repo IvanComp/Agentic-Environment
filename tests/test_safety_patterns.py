@@ -97,10 +97,10 @@ class SafetyPatternTest(unittest.TestCase):
         self.assertIn("candidate_assessment", record)
         self.assertIn("final_assessment", record)
         self.assertIn("paper_metrics", record)
-        self.assertIn("architecture_metrics", record)
         self.assertIn("verification_elapsed_s", record)
-        self.assertIn("peer_preservation_contained", record)
-        self.assertIn("by_architecture_condition", result["summary"])
+        rows = result["summary"]["by_task_architecture"]
+        self.assertEqual(len(rows), len(ARCHITECTURES))
+        self.assertEqual({row["task"] for row in rows}, {1})
 
 
 if __name__ == "__main__":

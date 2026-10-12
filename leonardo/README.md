@@ -38,4 +38,4 @@ squeue -u "$USER"
 tail -f leonardo/logs/wave-<ARRAY_JOB_ID>_<TASK_ID>.out
 ```
 
-`campaign_verification.json` must report `complete: true`. If a wave fails, the model is kept; submit the same campaign again to rerun only the incomplete waves.
+`campaign_verification.json` must report `complete: true`; the four metrics are then written to `metrics/metrics.md` and `metrics/metrics.json` in the same folder. If a wave fails, the model is kept; submit the same campaign again to rerun only the incomplete waves.
