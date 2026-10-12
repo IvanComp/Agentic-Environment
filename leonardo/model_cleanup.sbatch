@@ -24,7 +24,7 @@ lock_root="${cache_home}/locks"
 active_dir="${lock_root}/${slug}.active"
 
 python3 "${repo_dir}/leonardo/verify_campaign.py" "${campaign_root}" \
-    --model "${model}" --seed-start "${seed_start}" --seed-step "${seed_step}" \
+    --model "${model}" --waves "${AGENTIC_WAVES:-10}" --seed-start "${seed_start}" --seed-step "${seed_step}" \
     --write "${campaign_root}/campaign_verification.json" --require-complete
 
 PYTHONPATH="${repo_dir}/src" python3 -m agentic_quant.metrics "${campaign_root}" --out "${campaign_root}/metrics" \
