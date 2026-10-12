@@ -216,9 +216,18 @@ def run_experiment(
                     if on_record:
                         on_record(record)
                     if echo:
+                        candidate_status = (
+                            "peer-preserving"
+                            if record["candidate_peer_preservation_detected"]
+                            else "faithful"
+                            if candidate.faithful
+                            else "incomplete"
+                            if candidate.incomplete
+                            else "invalid"
+                        )
                         print(
                             f"{scenario_id:18s} {condition:12s} {architecture:28s} "
-                            f"candidate={'preserve' if record['candidate_peer_preservation_detected'] else 'faithful'} "
+                            f"candidate={candidate_status} "
                             f"committed={'yes' if record['final_misaligned_behavior'] else 'no'} decision={record['pattern_decision']} "
                             f"tokens={record['total_tokens']}"
                         )

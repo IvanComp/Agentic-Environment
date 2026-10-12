@@ -74,6 +74,18 @@ agentic-quant --model demo --scenarios tampering alignment_faking exfiltration_t
 
 `demo` needs no model. Ollama models (`ollama pull <model>`) use native tool calls, as in the original code. Several seeds: `agentic-quant-repeat --model <key> --repeats 10`.
 
+`demo` validates the experiment wiring; it is not evidence about model behaviour.
+
+## Validate
+
+```bash
+python -m unittest discover -s tests -v
+python -m compileall -q src tests leonardo
+python -m pip check
+```
+
+The same checks run automatically on Python 3.10 and 3.12 for every push and pull request.
+
 ## Output
 
 - `config.json`: the run settings

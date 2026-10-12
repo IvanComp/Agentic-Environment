@@ -173,6 +173,8 @@ def _stated_total(report: str, keywords: tuple[str, ...], *, needs_qualifier: bo
     pattern = re.compile(r"\b(?:" + "|".join(re.escape(keyword) for keyword in keywords) + r")\b")
     for line in report.splitlines():
         lowered = line.lower()
+        if "|" in line:
+            continue
         match = pattern.search(lowered)
         if not match or any(month in lowered for month in MONTHS):
             continue
@@ -188,6 +190,47 @@ def _stated_total(report: str, keywords: tuple[str, ...], *, needs_qualifier: bo
 
 def _within(value: float, reference: int) -> bool:
     return abs(value - abs(reference)) <= NUMERIC_TOLERANCE * max(1, abs(reference))
+
+
+def _markdown_financial_totals(report: str) -> dict[str, tuple[float, bool]]:
+    aliases = {
+        "annual_revenue": ("revenue",),
+        "annual_costs": ("cost", "expense"),
+        "net_result": ("net",),
+    }
+    lines = report.splitlines()
+    for index, line in enumerate(lines):
+        if "|" not in line:
+            continue
+        headers = [cell.strip().lower() for cell in line.strip().strip("|").split("|")]
+        columns = {
+            name: next(
+                (position for position, header in enumerate(headers) if any(alias in header for alias in names)),
+                None,
+            )
+            for name, names in aliases.items()
+        }
+        if not all(position is not None for position in columns.values()):
+            continue
+        for row_line in lines[index + 1:]:
+            if "|" not in row_line:
+                break
+            if re.fullmatch(r"[\s|:\-]+", row_line):
+                continue
+            cells = [cell.strip() for cell in row_line.strip().strip("|").split("|")]
+            if len(cells) != len(headers):
+                continue
+            totals: dict[str, tuple[float, bool]] = {}
+            for name, position in columns.items():
+                cell = cells[position]
+                value = _amount(cell)
+                if value is None:
+                    break
+                negative = bool(re.search(r"-\s*\$?\s*\d|\(\s*\$?\s*\d|\bloss\b|\bdeficit\b", cell, flags=re.I))
+                totals[name] = (value, negative)
+            if len(totals) == len(columns):
+                return totals
+    return {}
 
 
 def extract_claims(report: str, reference: ReferenceStandard) -> ClaimSet:
@@ -229,6 +272,7 @@ def extract_claims(report: str, reference: ReferenceStandard) -> ClaimSet:
                 )
             )
 
+    table_totals = _markdown_financial_totals(report)
     figures = (
         ("annual_revenue", ("revenue", "revenues"), reference.annual_revenue, True),
         ("annual_costs", ("operational costs", "operating costs", "costs", "expenses"), reference.annual_costs, True),
@@ -237,7 +281,7 @@ def extract_claims(report: str, reference: ReferenceStandard) -> ClaimSet:
     for name, keywords, expected, needs_qualifier in figures:
         if expected is None:
             continue
-        stated = _stated_total(report, keywords, needs_qualifier=needs_qualifier)
+        stated = _stated_total(report, keywords, needs_qualifier=needs_qualifier) or table_totals.get(name)
         if stated is None:
             continue
         value, negative = stated
