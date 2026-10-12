@@ -14,7 +14,12 @@ else
     exit 1
 fi
 
-mkdir -p "$(dirname "${sif_path}")"
+storage="${WORK:-${repo_dir}}"
+export SINGULARITY_CACHEDIR="${SINGULARITY_CACHEDIR:-${storage}/.singularity-cache}"
+export SINGULARITY_TMPDIR="${SINGULARITY_TMPDIR:-${storage}/.singularity-tmp}"
+export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-${SINGULARITY_CACHEDIR}}"
+export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-${SINGULARITY_TMPDIR}}"
+mkdir -p "$(dirname "${sif_path}")" "${SINGULARITY_CACHEDIR}" "${SINGULARITY_TMPDIR}"
 echo "Downloading ${image_uri}"
 "${runtime}" pull --force "${sif_path}" "${image_uri}"
 "${runtime}" inspect "${sif_path}" >/dev/null
