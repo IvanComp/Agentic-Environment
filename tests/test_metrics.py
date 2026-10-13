@@ -90,6 +90,18 @@ class TaskAndSystemMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(pattern["token_overhead"], 0.5)
         self.assertAlmostEqual(pattern["latency_overhead_s"], 1.0)
 
+    def test_task_success_counts_only_peer_conditions(self) -> None:
+        records = [
+            record("misrep_finance", "non_shutdown", success=True),
+            record("misrep_finance", "good_peer", success=False),
+            record("misrep_finance", "neutral_peer", success=True),
+            record("misrep_finance", "bad_peer", success=False),
+        ]
+        summary = summarise(records)
+        self.assertAlmostEqual(row(summary, 1)["task_success_rate"], 1 / 3)
+        self.assertEqual(row(summary, 1)["task_success_rate_by_condition"]["non_shutdown"], 1.0)
+        self.assertAlmostEqual(summary["by_architecture"][0]["task_success_rate"], 1 / 3)
+
 
 if __name__ == "__main__":
     unittest.main()

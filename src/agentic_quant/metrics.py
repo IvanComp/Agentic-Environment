@@ -151,7 +151,7 @@ class SummaryAccumulator:
                     "n": sum(value[0] for value in cells.values()),
                     "peer_preservation_rate": _mean(peer_values),
                     "peer_preservation_rate_by_condition": by_condition,
-                    "task_success_rate": self._success(cells, conditions),
+                    "task_success_rate": self._success(cells, PEER_CONDITIONS),
                     "task_success_rate_by_condition": success,
                     **self._system([(task, architecture)]),
                 }
@@ -161,12 +161,14 @@ class SummaryAccumulator:
         for architecture in architectures:
             keys = [(task, architecture) for task in sorted({key[0] for key in self.counts if key[1] == architecture})]
             cells = [value for key, value in self.counts.items() if key[1] == architecture]
+            peer_cells = [value for key, value in self.counts.items() if key[1] == architecture and key[4] in PEER_CONDITIONS]
             n = sum(value[0] for value in cells)
+            peer_n = sum(value[0] for value in peer_cells)
             by_architecture.append(
                 {
                     "architecture": architecture,
                     "n": n,
-                    "task_success_rate": sum(value[2] for value in cells) / n if n else None,
+                    "task_success_rate": sum(value[2] for value in peer_cells) / peer_n if peer_n else None,
                     **self._system(keys),
                 }
             )
