@@ -3,9 +3,10 @@
 #SBATCH --partition=boost_usr_prod
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1
-#SBATCH --mem=120G
+#SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:4
+#SBATCH --exclusive
+#SBATCH --mem=480G
 #SBATCH --time=24:00:00
 #SBATCH --signal=B:TERM@300
 #SBATCH --output=leonardo/logs/wave-%A_%a.out
@@ -60,7 +61,7 @@ export AGENTIC_CACHE_HOME="${cache_home}"
 export AGENTIC_OUTPUT_ROOT="${campaign_root}"
 export AGENTIC_CONTAINER_NV=1
 export OLLAMA_HOST="http://127.0.0.1:$((20000 + SLURM_JOB_ID % 20000))"
-export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
 
 ollama_pid=""
 experiment_pid=""
@@ -82,25 +83,17 @@ mkdir -p "${campaign_root}"
 backend="$("${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py backend "${model}")"
 if [[ "${backend}" == "ollama" ]]; then
     ollama_log="${campaign_root}/ollama-${SLURM_ARRAY_JOB_ID}_${task}.log"
-    echo "Slurm GPU variables: CUDA=${CUDA_VISIBLE_DEVICES:-unset} ORDINAL=${GPU_DEVICE_ORDINAL:-unset} ROCR=${ROCR_VISIBLE_DEVICES:-unset}" >&2
-    gpu_uuids="$("${repo_dir}/leonardo/container_exec.sh" nvidia-smi --query-gpu=uuid --format=csv,noheader)"
-    if [[ "$(wc -l <<<"${gpu_uuids}")" -gt 1 && -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
-        gpu_uuids="$("${repo_dir}/leonardo/container_exec.sh" nvidia-smi --query-gpu=uuid --format=csv,noheader -i "${CUDA_VISIBLE_DEVICES}")"
-    fi
-    CUDA_VISIBLE_DEVICES="$(paste -sd, <<<"${gpu_uuids}")"
-    export CUDA_VISIBLE_DEVICES
-    unset GPU_DEVICE_ORDINAL ROCR_VISIBLE_DEVICES HIP_VISIBLE_DEVICES
-    "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
+    OLLAMA_DEBUG=1 "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
     ollama_pid=$!
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py wait "${model}" --timeout 180
     for _ in $(seq 60); do
         grep -q "inference compute" "${ollama_log}" && break
         sleep 1
     done
-    echo "Ollama CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}" >&2
     "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L >&2 || true
     grep "inference compute" "${ollama_log}" >&2 || true
     if ! grep -qi "inference compute.*library=cuda" "${ollama_log}"; then
+        grep -i -E "cuda|nvml|libdirs|error|fail" "${ollama_log}" | grep -v "server config" | head -n 30 >&2 || true
         echo "Ollama sees no GPU on ${SLURMD_NODENAME:-unknown}; stopping instead of running on CPU." >&2
         exit 3
     fi
