@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-campaign="${1:-test}"
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-root="${AGENTIC_RESULTS_ROOT:-${WORK}/Agentic-Environment/campaigns}/${campaign}"
+campaigns="${AGENTIC_RESULTS_ROOT:-${WORK}/Agentic-Environment/campaigns}"
+campaign="${1:-$(ls -t "${campaigns}" 2>/dev/null | head -n 1)}"
+root="${campaigns}/${campaign:?no campaign found in ${campaigns}}"
 
 if [[ -f "${root}/jobs.txt" ]]; then
     read -r prepare_job wave_job cleanup_job <"${root}/jobs.txt" || true

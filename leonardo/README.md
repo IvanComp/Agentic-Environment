@@ -32,13 +32,15 @@ export AGENTIC_CAMPAIGN_NAME=task1-patterns-v1
 - `AGENTIC_WAVE_SBATCH_ARGS` adds sbatch options to the wave jobs, e.g. `"--qos=boost_qos_dbg --time=00:30:00"` for a short test in the debug queue.
 - Use a new `AGENTIC_CAMPAIGN_NAME` whenever the protocol changes.
 
-## Quick test
+## Run
 
 ```bash
+./leonardo/campaign.sh gpt-oss:20b
 ./leonardo/test.sh gpt-oss:20b
+./leonardo/results.sh
 ```
 
-Updates the code to `origin/main`, deletes the previous `campaigns/test` folder, submits one wave of the experiment in the debug queue, waits for it and prints the results. `./leonardo/results.sh` prints them again later (job states, the four metrics and what the critic did in each condition); `./leonardo/results.sh <campaign>` does the same for any campaign.
+`campaign.sh` runs 100 waves (10 per GPU job, 4 h each); `test.sh` runs one wave in the debug queue. Both update the code to `origin/main`, cancel your old jobs, delete all previous campaigns and logs (the model cache and the image stay), submit, wait and print the results. No exports are needed. `results.sh` prints the latest results again (job states, the four metrics and what the critic did in each condition).
 
 ## Output
 
