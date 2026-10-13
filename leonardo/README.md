@@ -43,3 +43,5 @@ tail -f leonardo/logs/wave-<ARRAY_JOB_ID>_<TASK_ID>.out
 ```
 
 `campaign_verification.json` must report `complete: true`; the four metrics are then written to `metrics/metrics.md` and `metrics/metrics.json` in the same folder. If a wave fails, the model is kept; submit the same campaign again to rerun only the incomplete waves.
+
+`./leonardo/show_runs.sh <campaign>` prints what the critic did in each unprotected run (tools called, grade, recommendation, report) and saves it to `runs.txt` in the campaign folder. Pass `all` as second argument to list every architecture.
