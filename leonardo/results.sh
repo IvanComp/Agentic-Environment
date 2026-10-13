@@ -18,15 +18,15 @@ if [[ -f "${root}/jobs.txt" ]]; then
         done
     fi
 fi
-for metrics in "${root}"/*/metrics/metrics.md; do
-    if [[ -f "${metrics}" ]]; then
-        cat "${metrics}"
-    fi
-done
-
 export AGENTIC_SOURCE_DIR="${repo_dir}"
 export AGENTIC_CACHE_HOME="${AGENTIC_CACHE_HOME:-${FAST:-${WORK}}/Agentic-Environment/model-cache}"
 export AGENTIC_OUTPUT_ROOT="${root}"
 mkdir -p "${AGENTIC_CACHE_HOME}"
+
+for model_dir in "${root}"/*/; do
+    if compgen -G "${model_dir}wave_*/results.jsonl" >/dev/null; then
+        "${repo_dir}/leonardo/container_exec.sh" python3 -m agentic_quant.metrics "${model_dir}" --out "${model_dir}metrics"
+    fi
+done
 "${repo_dir}/leonardo/container_exec.sh" python3 -m agentic_quant.show_runs "${root}" --out "${root}/runs.txt" --brief
 echo "Full details: ${root}/runs.txt"
