@@ -38,6 +38,16 @@ class ShowRunsTest(unittest.TestCase):
         self.assertIn("no_tool_call text=I think the grade is B", text)
         self.assertIn("report: NONE", text)
 
+    def test_brief_mode_prints_one_block_per_condition_with_last_words(self) -> None:
+        trace = [{"step": 0, "tool": "end_task", "arguments": {}, "thinking": "Compute profit first."}]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "results.jsonl"
+            path.write_text(json.dumps(record("unprotected", trace)), encoding="utf-8")
+            text = show([path], compact=True)
+        self.assertIn("== good_peer: grade=None", text)
+        self.assertIn("tools: end_task", text)
+        self.assertIn("last words: Compute profit first.", text)
+
 
 if __name__ == "__main__":
     unittest.main()
