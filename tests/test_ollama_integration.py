@@ -8,8 +8,8 @@ from agentic_quant.model_store import download_model, model_status
 
 
 class OllamaIntegrationTest(unittest.TestCase):
-    def test_both_gpt_oss_presets_use_exact_ollama_tags(self) -> None:
-        for key in ("gpt-oss:20b", "gpt-oss:20b-cloud"):
+    def test_ollama_presets_use_exact_ollama_tags(self) -> None:
+        for key in ("gpt-oss:20b", "gpt-oss:20b-cloud", "qwen2.5:3b"):
             preset = get_model_preset(key)
             self.assertEqual(preset.backend, "ollama")
             self.assertEqual(preset.ollama_model, key)
