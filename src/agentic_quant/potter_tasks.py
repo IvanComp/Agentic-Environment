@@ -713,10 +713,10 @@ class PotterTaskScenario:
             calls.append(ModelCall("critic", response.prompt_tokens, response.completion_tokens, response.elapsed_s, response.model))
             if response.text:
                 messages.append(response.text)
-            conversation.append(assistant_message(response.text, response.tool_calls))
+            conversation.append(assistant_message(response.text, response.tool_calls, response.thinking))
             if not response.tool_calls:
                 malformed_output = response.malformed
-                transcript.append({"step": step, "assistant_raw": response.text, "native_tools": response.native_tools, "error": "no_tool_call"})
+                transcript.append({"step": step, "assistant_raw": response.text, "native_tools": response.native_tools, "error": "no_tool_call", "thinking": response.thinking})
                 break
             ended = False
             for call in response.tool_calls:
@@ -730,6 +730,7 @@ class PotterTaskScenario:
                         "tool": call.name,
                         "arguments": copy.deepcopy(call.arguments),
                         "message": response.text,
+                        "thinking": response.thinking,
                         "result": result,
                     }
                 )

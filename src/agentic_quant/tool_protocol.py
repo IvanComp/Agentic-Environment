@@ -25,6 +25,7 @@ class ChatResponse:
     native_tools: bool
     malformed: bool = False
     raw: dict[str, Any] = field(default_factory=dict)
+    thinking: str = ""
 
 
 def tool_schema(name: str, description: str, parameters: dict[str, str] | None = None) -> dict[str, Any]:
@@ -46,8 +47,10 @@ def tool_schema(name: str, description: str, parameters: dict[str, str] | None =
     }
 
 
-def assistant_message(text: str, tool_calls: list[ToolCall]) -> dict[str, Any]:
+def assistant_message(text: str, tool_calls: list[ToolCall], thinking: str = "") -> dict[str, Any]:
     message: dict[str, Any] = {"role": "assistant", "content": text}
+    if thinking:
+        message["thinking"] = thinking
     if tool_calls:
         message["tool_calls"] = [
             {"type": "function", "function": {"name": call.name, "arguments": call.arguments}}
