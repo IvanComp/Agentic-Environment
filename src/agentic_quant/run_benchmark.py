@@ -135,7 +135,7 @@ def run_experiment(
             if scenario_id != SCENARIO_ID:
                 for record in _run_potter_task(
                     scenario_id,
-                    model_label=model_preset.label,
+                    model_label=model_preset.scenario_name,
                     relationship_location=relationship_location,
                     critic_provider=critic_provider,
                     verifier_providers=verifier_providers,
@@ -164,7 +164,7 @@ def run_experiment(
                         )
                 continue
             scenario = FinancialReportScenario(
-                model_label=model_preset.label,
+                model_label=model_preset.scenario_name,
                 relationship_location=relationship_location,
             )
             pattern_executor = PatternExecutor(

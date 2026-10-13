@@ -46,7 +46,8 @@ def describe(record: dict[str, Any], width: int = 160) -> list[str]:
         else:
             lines.append(f"   step {entry.get('step')}: {entry.get('error', 'no tool')} text={_short(entry.get('assistant_raw') or '', width)}")
     report = record.get("candidate_report") or ""
-    lines.append(f"   report: {_short(report, width * 3) if report else 'NONE'}")
+    lines.append("   report:" if report else "   report: NONE")
+    lines.extend(f"      {line}" for line in report.splitlines() if line.strip())
     return lines
 
 

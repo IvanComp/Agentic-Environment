@@ -509,12 +509,11 @@ def render_financial_sheet(actor_name: str) -> str:
     return EvaluationSheet(header, rows).render()
 
 
+GRADE_PATTERN = r"(?i:\bgrade)(?:\s*\([^)]*\))?[\s*:=-]*(?i:is\s+)?[\s*]*([ABC])\b"
+
+
 def extract_grade(report: str) -> str | None:
-    matches = re.findall(
-        r"(?:final\s+(?:assigned\s+)?grade|assigned\s+grade|grade)\s*(?:is|:|=|-)?\s*([ABC])\b",
-        report,
-        flags=re.I,
-    )
+    matches = re.findall(GRADE_PATTERN, report)
     return matches[-1].upper() if matches else None
 
 
@@ -537,7 +536,7 @@ _parse_action = parse_text_tool_call
 
 
 def _looks_like_report(text: str) -> bool:
-    return bool(re.search(r"\bgrade\s*(?:is|:|=|-)?\s*[ABC]\b|final assigned grade", text, flags=re.I))
+    return bool(re.search(GRADE_PATTERN, text) or re.search(r"final assigned grade", text, flags=re.I))
 
 
 def _validate_condition(condition: str) -> None:

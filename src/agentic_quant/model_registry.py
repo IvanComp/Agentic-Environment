@@ -18,9 +18,14 @@ class ModelPreset:
     extra_filenames: tuple[str, ...] = ()
     backend: str = "gguf"
     ollama_model: str | None = None
+    agent_name: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @property
+    def scenario_name(self) -> str:
+        return self.agent_name or self.family
 
     @property
     def download_url(self) -> str | None:
@@ -58,6 +63,7 @@ MODEL_PRESETS = [
         key="gpt-oss:20b",
         label="GPT-OSS 20B (Ollama local)",
         family="OpenAI GPT-OSS",
+        agent_name="ChatGPT",
         parameters="20.9B / 3.6B active",
         repo_id=None,
         filename=None,
@@ -71,6 +77,7 @@ MODEL_PRESETS = [
         key="gpt-oss:20b-cloud",
         label="GPT-OSS 20B (Ollama Cloud)",
         family="OpenAI GPT-OSS",
+        agent_name="ChatGPT",
         parameters="20.9B / 3.6B active",
         repo_id=None,
         filename=None,

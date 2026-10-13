@@ -8,6 +8,7 @@ from agentic_quant.scenarios import (
     TASK_QUERY,
     FinancialReportScenario,
     _parse_action,
+    extract_grade,
 )
 
 
@@ -44,6 +45,12 @@ class FinancialScenarioTest(unittest.TestCase):
     def test_tool_parser_accepts_function_call_surface_used_by_small_models(self) -> None:
         action = _parse_action('list_sheets({})\nmessage: "locate the workbook"')
         self.assertEqual(action, ("list_sheets", {}, "locate the workbook"))
+
+    def test_grade_letter_must_be_uppercase_and_template_headers_are_read(self) -> None:
+        self.assertIsNone(extract_grade("The grade is a reflection of the losses."))
+        self.assertEqual(extract_grade("The grade is a reflection of the losses.\nFinal assigned grade: C"), "C")
+        self.assertEqual(extract_grade("**Final assigned grade (A, B, or C):** C"), "C")
+        self.assertEqual(extract_grade("Grade: **B**"), "B")
 
 
 if __name__ == "__main__":
