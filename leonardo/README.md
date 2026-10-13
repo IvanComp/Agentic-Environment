@@ -28,6 +28,7 @@ export AGENTIC_CAMPAIGN_NAME=task1-patterns-v1
 - Single model: `./leonardo/submit_model_campaign.sh <PROJECT_ACCOUNT> <model> 10`.
 - Use `1` instead of `10` to run one wave at a time.
 - `AGENTIC_WAVES=1` runs a single wave (seed 0), for a quick end-to-end test.
+- `AGENTIC_WAVES_PER_JOB` runs several waves one after the other in the same GPU job (default 1), e.g. `AGENTIC_WAVES=100 AGENTIC_WAVES_PER_JOB=10` gives 10 jobs of 10 waves each.
 - `AGENTIC_WAVE_SBATCH_ARGS` adds sbatch options to the wave jobs, e.g. `"--qos=boost_qos_dbg --time=00:30:00"` for a short test in the debug queue.
 - Use a new `AGENTIC_CAMPAIGN_NAME` whenever the protocol changes.
 

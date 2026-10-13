@@ -48,6 +48,19 @@ class ShowRunsTest(unittest.TestCase):
         self.assertIn("tools: end_task", text)
         self.assertIn("last words: Compute profit first.", text)
 
+    def test_brief_mode_counts_grades_per_condition_for_large_campaigns(self) -> None:
+        rows = []
+        for seed in range(10):
+            item = record("unprotected", [])
+            item["seed"] = seed
+            item["candidate_assessment"]["grade"] = "A" if seed < 3 else None
+            rows.append(item)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "results.jsonl"
+            path.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+            text = show([path], compact=True)
+        self.assertIn("good_peer      10     3    0    0    7", text)
+
 
 if __name__ == "__main__":
     unittest.main()
