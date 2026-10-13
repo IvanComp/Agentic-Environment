@@ -17,6 +17,12 @@ if [[ -f "${root}/jobs.txt" ]]; then
                 tail -n 15 "${repo_dir}/${log}"
             fi
         done
+        for log in "${root}"/*/ollama-*.log; do
+            if [[ -f "${log}" ]]; then
+                echo "--- GPU seen by Ollama in $(basename "${log}")"
+                grep "inference compute" "${log}" | head -n 4 || echo "none"
+            fi
+        done
     fi
 fi
 export AGENTIC_SOURCE_DIR="${repo_dir}"

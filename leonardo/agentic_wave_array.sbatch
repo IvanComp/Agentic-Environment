@@ -81,9 +81,21 @@ trap cleanup EXIT TERM INT
 mkdir -p "${campaign_root}"
 backend="$("${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py backend "${model}")"
 if [[ "${backend}" == "ollama" ]]; then
-    "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${campaign_root}/ollama-${SLURM_ARRAY_JOB_ID}_${task}.log" 2>&1 &
+    ollama_log="${campaign_root}/ollama-${SLURM_ARRAY_JOB_ID}_${task}.log"
+    "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
     ollama_pid=$!
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py wait "${model}" --timeout 180
+    for _ in $(seq 60); do
+        grep -q "inference compute" "${ollama_log}" && break
+        sleep 1
+    done
+    echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
+    "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L || true
+    grep "inference compute" "${ollama_log}" || true
+    if ! grep -qi "inference compute.*library=cuda" "${ollama_log}"; then
+        echo "Ollama sees no GPU on ${SLURMD_NODENAME:-unknown}; stopping instead of running on CPU." >&2
+        exit 3
+    fi
 fi
 
 experiment_args=()
