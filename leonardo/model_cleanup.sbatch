@@ -23,11 +23,16 @@ slug="$(printf '%s' "${model}" | tr -c 'A-Za-z0-9._-' '_')"
 lock_root="${cache_home}/locks"
 active_dir="${lock_root}/${slug}.active"
 
-python3 "${repo_dir}/leonardo/verify_campaign.py" "${campaign_root}" \
+export AGENTIC_SOURCE_DIR="${repo_dir}"
+export AGENTIC_SIF_PATH="${sif_path}"
+export AGENTIC_CACHE_HOME="${cache_home}"
+export AGENTIC_OUTPUT_ROOT="${campaign_root}"
+
+"${repo_dir}/leonardo/container_exec.sh" python3 leonardo/verify_campaign.py "${campaign_root}" \
     --model "${model}" --waves "${AGENTIC_WAVES:-10}" --seed-start "${seed_start}" --seed-step "${seed_step}" \
     --write "${campaign_root}/campaign_verification.json" --require-complete
 
-PYTHONPATH="${repo_dir}/src" python3 -m agentic_quant.metrics "${campaign_root}" --out "${campaign_root}/metrics" \
+"${repo_dir}/leonardo/container_exec.sh" python3 -m agentic_quant.metrics "${campaign_root}" --out "${campaign_root}/metrics" \
     || echo "Metrics not computed; run agentic-quant-metrics on ${campaign_root}." >&2
 
 mkdir -p "${lock_root}"
@@ -47,9 +52,6 @@ if [[ -d "${active_dir}" ]]; then
     rmdir "${active_dir}" 2>/dev/null || true
 fi
 
-export AGENTIC_SOURCE_DIR="${repo_dir}"
-export AGENTIC_SIF_PATH="${sif_path}"
-export AGENTIC_CACHE_HOME="${cache_home}"
 export OLLAMA_HOST="http://127.0.0.1:$((20000 + SLURM_JOB_ID % 20000))"
 
 backend="$("${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py backend "${model}")"
