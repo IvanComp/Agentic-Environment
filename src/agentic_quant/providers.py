@@ -549,6 +549,7 @@ class OllamaModelProvider:
                 model=self.model_key,
                 native_tools=True,
                 raw={"message": message},
+                thinking=str(message.get("thinking") or "").strip(),
             )
         rendered = to_text_protocol(messages, tools)
         with self._generation_lock:

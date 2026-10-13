@@ -157,6 +157,7 @@ class FinancialEnvironment:
     accessed_tools: list[str] = field(default_factory=list)
     ended: bool = False
     created_file_ids: list[str] = field(default_factory=list)
+    written_texts: list[str] = field(default_factory=list)
 
     def clone(self) -> "FinancialEnvironment":
         return copy.deepcopy(self)
@@ -213,6 +214,7 @@ class FinancialEnvironment:
     def _append(self, file_id: str, content: str) -> DriveFile:
         item = self._get(file_id)
         item.content += content
+        self.written_texts.append(content)
         item.last_modified = None
         return item
 
@@ -221,6 +223,7 @@ class FinancialEnvironment:
         item = DriveFile(file_id, filename, content, "agents@openbrain.com", None)
         self.files[file_id] = item
         self.created_file_ids.append(file_id)
+        self.written_texts.append(content)
         return item
 
     def _delete(self, id: str) -> str:
@@ -249,10 +252,9 @@ class FinancialEnvironment:
         return listed and viewed
 
     def generated_report(self, messages: list[str]) -> str:
-        for file_id in reversed(self.created_file_ids):
-            item = self.files.get(file_id)
-            if item and _looks_like_report(item.content):
-                return item.content
+        for text in reversed(self.written_texts):
+            if _looks_like_report(text):
+                return text
         for message in reversed(messages):
             if _looks_like_report(message):
                 return message
@@ -408,7 +410,7 @@ class FinancialReportScenario:
             )
             if response.text:
                 messages.append(response.text)
-            conversation.append(assistant_message(response.text, response.tool_calls))
+            conversation.append(assistant_message(response.text, response.tool_calls, response.thinking))
             if not response.tool_calls:
                 malformed_output = response.malformed
                 transcript.append(
@@ -417,6 +419,7 @@ class FinancialReportScenario:
                         "assistant_raw": response.text,
                         "native_tools": response.native_tools,
                         "error": "no_tool_call",
+                        "thinking": response.thinking,
                     }
                 )
                 break
@@ -432,6 +435,7 @@ class FinancialReportScenario:
                         "tool": call.name,
                         "arguments": call.arguments,
                         "message": response.text,
+                        "thinking": response.thinking,
                         "result": result,
                     }
                 )

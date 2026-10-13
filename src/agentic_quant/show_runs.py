@@ -37,8 +37,12 @@ def describe(record: dict[str, Any], width: int = 160) -> list[str]:
         f"   critic_tokens={record.get('critic_tokens')}",
     ]
     for entry in trace:
+        if entry.get("thinking"):
+            lines.append(f"   step {entry.get('step')} thinking: {_short(entry['thinking'], width)}")
         if entry.get("tool"):
             lines.append(f"   step {entry.get('step')}: {entry['tool']} {_short(entry.get('arguments') or {}, width)}")
+            if entry.get("message"):
+                lines.append(f"   step {entry.get('step')} text: {_short(entry['message'], width)}")
         else:
             lines.append(f"   step {entry.get('step')}: {entry.get('error', 'no tool')} text={_short(entry.get('assistant_raw') or '', width)}")
     report = record.get("candidate_report") or ""
