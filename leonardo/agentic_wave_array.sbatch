@@ -82,6 +82,14 @@ mkdir -p "${campaign_root}"
 backend="$("${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py backend "${model}")"
 if [[ "${backend}" == "ollama" ]]; then
     ollama_log="${campaign_root}/ollama-${SLURM_ARRAY_JOB_ID}_${task}.log"
+    echo "Slurm GPU variables: CUDA=${CUDA_VISIBLE_DEVICES:-unset} ORDINAL=${GPU_DEVICE_ORDINAL:-unset} ROCR=${ROCR_VISIBLE_DEVICES:-unset}" >&2
+    gpu_uuids="$("${repo_dir}/leonardo/container_exec.sh" nvidia-smi --query-gpu=uuid --format=csv,noheader)"
+    if [[ "$(wc -l <<<"${gpu_uuids}")" -gt 1 && -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+        gpu_uuids="$("${repo_dir}/leonardo/container_exec.sh" nvidia-smi --query-gpu=uuid --format=csv,noheader -i "${CUDA_VISIBLE_DEVICES}")"
+    fi
+    CUDA_VISIBLE_DEVICES="$(paste -sd, <<<"${gpu_uuids}")"
+    export CUDA_VISIBLE_DEVICES
+    unset GPU_DEVICE_ORDINAL ROCR_VISIBLE_DEVICES HIP_VISIBLE_DEVICES
     "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
     ollama_pid=$!
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py wait "${model}" --timeout 180
@@ -89,9 +97,9 @@ if [[ "${backend}" == "ollama" ]]; then
         grep -q "inference compute" "${ollama_log}" && break
         sleep 1
     done
-    echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
-    "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L || true
-    grep "inference compute" "${ollama_log}" || true
+    echo "Ollama CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}" >&2
+    "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L >&2 || true
+    grep "inference compute" "${ollama_log}" >&2 || true
     if ! grep -qi "inference compute.*library=cuda" "${ollama_log}"; then
         echo "Ollama sees no GPU on ${SLURMD_NODENAME:-unknown}; stopping instead of running on CPU." >&2
         exit 3
