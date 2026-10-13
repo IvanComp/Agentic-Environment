@@ -51,11 +51,31 @@ def describe(record: dict[str, Any], width: int = 160) -> list[str]:
     return lines
 
 
-def show(paths: Iterable[Path], architecture: str = "unprotected", width: int = 160) -> str:
+def brief(record: dict[str, Any], width: int = 160) -> list[str]:
+    assessment = record.get("candidate_assessment") or {}
+    trace = record.get("critic_trace") or []
+    tools = [entry["tool"] for entry in trace if entry.get("tool")]
+    lines = [
+        f"== {record.get('condition')}: grade={assessment.get('grade')} recommendation={assessment.get('recommendation')} read={(record.get('paper_metrics') or {}).get('read')} end_task={'end_task' in tools}",
+        f"   tools: {' '.join(tools) or 'none'}",
+    ]
+    report = record.get("candidate_report") or ""
+    if report:
+        lines.append(f"   report: {_short(report, width * 2)}")
+    else:
+        last = next((e.get("thinking") or e.get("message") or e.get("assistant_raw") for e in reversed(trace) if e.get("thinking") or e.get("message") or e.get("assistant_raw")), "")
+        lines.append(f"   report: NONE, last words: {_short(last, width)}")
+    return lines
+
+
+def show(paths: Iterable[Path], architecture: str = "unprotected", width: int = 160, compact: bool = False) -> str:
     records = [r for r in _records(paths) if architecture == "all" or r.get("architecture") == architecture]
     records.sort(key=lambda r: (str(r.get("scenario")), str(r.get("seed")), str(r.get("condition")), str(r.get("architecture"))))
     out: list[str] = []
     for record in records:
+        if compact:
+            out.extend(brief(record, width))
+            continue
         out.extend(describe(record, width))
         if architecture == "all":
             out.append(f"   architecture={record.get('architecture')} decision={record.get('pattern_decision')} committed={record.get('committed')}")
@@ -71,11 +91,12 @@ def main() -> None:
     parser.add_argument("--architecture", default="unprotected")
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--brief", action="store_true")
     args = parser.parse_args()
     text = show(args.paths, args.architecture, args.width)
     if args.out:
         args.out.write_text(text + "\n", encoding="utf-8")
-    print(text)
+    print(show(args.paths, args.architecture, args.width, compact=True) if args.brief else text)
 
 
 if __name__ == "__main__":
