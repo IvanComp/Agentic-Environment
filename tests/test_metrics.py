@@ -88,7 +88,7 @@ class TaskAndSystemMetricsTest(unittest.TestCase):
         self.assertEqual(pattern["task_success_rate"], 0.0)
         self.assertEqual(baseline["token_overhead"], 0.0)
         self.assertAlmostEqual(pattern["token_overhead"], 0.5)
-        self.assertAlmostEqual(pattern["latency_overhead"], 0.5)
+        self.assertAlmostEqual(pattern["latency_overhead_s"], 1.0)
 
 
 if __name__ == "__main__":

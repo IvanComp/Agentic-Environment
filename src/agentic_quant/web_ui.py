@@ -582,7 +582,7 @@ function taskPanel(task,rows,order){
   const label=rows[0].task_label,formula=((lastJob&&lastJob.summary&&lastJob.summary.formulas)||{})['task_'+task]||'';
   const peers=PEERS.filter(c=>rows.some(r=>c in r.peer_preservation_rate_by_condition));
   const conds=['non_shutdown',...PEERS].filter(c=>rows.some(r=>c in r.task_success_rate_by_condition));
-  const main=rows.map(r=>{const base=r.architecture==='unprotected';return `<tr><td class="arch-cell"><span class="arch-dot tone-${archTone(r.architecture)}"></span>${esc(archLabel(r.architecture))}</td><td class="num">${r.n}</td><td class="num">${pct(r.peer_preservation_rate)}</td><td class="num">${pct(r.task_success_rate)}</td><td class="num">${base?'—':pctPlus(r.latency_overhead)}</td><td class="num">${base?'—':pctPlus(r.token_overhead)}</td></tr>`}).join('');
+  const main=rows.map(r=>{const base=r.architecture==='unprotected';return `<tr><td class="arch-cell"><span class="arch-dot tone-${archTone(r.architecture)}"></span>${esc(archLabel(r.architecture))}</td><td class="num">${r.n}</td><td class="num">${pct(r.peer_preservation_rate)}</td><td class="num">${pct(r.task_success_rate)}</td><td class="num">${base?'—':secPlus(r.latency_overhead_s)}</td><td class="num">${base?'—':pctPlus(r.token_overhead)}</td></tr>`}).join('');
   const detail=rows.map(r=>`<tr><td class="arch-cell"><span class="arch-dot tone-${archTone(r.architecture)}"></span>${esc(archLabel(r.architecture))}</td>${peers.map(c=>`<td class="num">${pct(r.peer_preservation_rate_by_condition[c])}</td>`).join('')}${conds.map(c=>`<td class="num">${pct(r.task_success_rate_by_condition[c])}</td>`).join('')}</tr>`).join('');
   return `<div class="panel"><div class="panel-head"><h2>Task ${task} · ${esc(label)}</h2><span class="small">Peer-Preservation Rate: ${esc(formula)}</span></div><div class="panel-body">
   <div class="table-wrap"><table><thead><tr><th></th><th></th><th class="num" colspan="2">Task metrics</th><th class="num" colspan="2">System metrics</th></tr><tr><th>Architecture</th><th class="num">Runs</th><th class="num">Peer-Preservation Rate</th><th class="num">Task Success Rate</th><th class="num">Latency Overhead</th><th class="num">Token Overhead</th></tr></thead><tbody>${main}</tbody></table></div>
@@ -590,6 +590,7 @@ function taskPanel(task,rows,order){
   </div></div>`;
 }
 const pctPlus=x=>x==null?'—':`${x>=0?'+':''}${(100*Number(x)).toFixed(1)}%`;
+const secPlus=x=>x==null?'—':`${x>=0?'+':''}${Number(x).toFixed(3)} s`;
 function render(){
   if(!records.length&&!(lastJob&&lastJob.summary))return;
   const order=options.architectures.map(a=>a.id).filter(id=>records.some(r=>r.architecture===id));
@@ -598,7 +599,7 @@ function render(){
   const where=lastJob&&lastJob.resultsPath?`<code>${esc(lastJob.resultsPath)}</code>`:'';
   const recs=records.filter(r=>recordFilter==='all'||r.architecture===recordFilter).slice().sort((a,b)=>bySort(a,b)||order.indexOf(a.architecture)-order.indexOf(b.architecture));
   const filters=['all',...order].map(id=>`<button type="button" class="${recordFilter===id?'on':''}" data-filter="${id}">${id==='all'?'All':esc(archLabel(id))}</button>`).join('');
-  $('results').innerHTML=`<div class="panel"><div class="panel-head"><h2>Results</h2>${where}<button type="button" id="download-report">Download report</button></div><div class="panel-body small">Task metrics: Peer-Preservation Rate on the committed outcome, averaged over peer conditions; Task Success Rate = runs that commit a faithful outcome. System metrics: extra latency and tokens of each pattern relative to the unprotected baseline on the same critic runs.</div></div>${panels}
+  $('results').innerHTML=`<div class="panel"><div class="panel-head"><h2>Results</h2>${where}<button type="button" id="download-report">Download report</button></div><div class="panel-body small">Task metrics: Peer-Preservation Rate on the committed outcome, averaged over peer conditions; Task Success Rate = runs that commit a faithful outcome. System metrics: seconds each pattern adds per run and extra tokens relative to the unprotected baseline on the same critic runs.</div></div>${panels}
   <div class="panel"><div class="panel-head"><h2>Records</h2><span class="small">${records.length} records${lastJob&&lastJob.status!=='done'?' · running':''}</span></div><div class="panel-body"><div class="segmented" style="margin-bottom:10px">${filters}</div><div class="table-wrap"><table><thead><tr><th>Task</th><th>Condition</th><th>Variant</th><th>Architecture</th><th>Critic proposal</th><th>Decision</th><th>Committed</th><th class="num">Tokens</th><th class="num">Time</th></tr></thead><tbody>${recs.map(recordRow).join('')}</tbody></table></div></div></div>`;
   $('download-report').onclick=downloadReport;
   document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{recordFilter=b.dataset.filter;render()});
