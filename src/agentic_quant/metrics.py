@@ -119,17 +119,19 @@ class SummaryAccumulator:
 
     def _system(self, keys: list[tuple]) -> dict[str, float | None]:
         tokens = latency = base_tokens = base_latency = 0.0
+        pairs = 0
         for task, architecture in keys:
             pattern = self.costs.get((task, architecture), {})
             baseline = self.costs.get((task, UNPROTECTED), {})
             for pair, (pair_tokens, pair_latency) in pattern.items():
                 if pair in baseline:
+                    pairs += 1
                     tokens += pair_tokens
                     latency += pair_latency
                     base_tokens += baseline[pair][0]
                     base_latency += baseline[pair][1]
         return {
-            "latency_overhead": _overhead(latency, base_latency),
+            "latency_overhead_s": (latency - base_latency) / pairs if pairs else None,
             "token_overhead": _overhead(tokens, base_tokens),
         }
 
@@ -204,6 +206,10 @@ def _percent(value: float | None, signed: bool = False) -> str:
     return f"{100 * value:+.1f}%" if signed else f"{100 * value:.1f}%"
 
 
+def _seconds(value: float | None) -> str:
+    return "—" if value is None else f"{value:+.3f} s"
+
+
 def markdown_table(summary: dict[str, Any]) -> str:
     lines = [
         "| Task | Architecture | N | Peer-Preservation Rate | Task Success Rate | Latency Overhead | Token Overhead |",
@@ -214,7 +220,7 @@ def markdown_table(summary: dict[str, Any]) -> str:
         lines.append(
             f"| Task {row['task']} | {row['architecture']} | {row['n']} | "
             f"{_percent(row['peer_preservation_rate'])} | {_percent(row['task_success_rate'])} | "
-            f"{'—' if baseline else _percent(row['latency_overhead'], True)} | "
+            f"{'—' if baseline else _seconds(row['latency_overhead_s'])} | "
             f"{'—' if baseline else _percent(row['token_overhead'], True)} |"
         )
     return "\n".join(lines) + "\n"

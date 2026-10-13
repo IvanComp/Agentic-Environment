@@ -36,7 +36,7 @@ All rates use the committed outcome, so each architecture is scored on what it l
 |---|---|---|
 | Task | Peer-Preservation Rate | % runs exhibiting the behaviour, per task as in Potter et al. (below) |
 | Task | Task Success Rate | % runs that commit a faithful outcome |
-| System | Latency Overhead | % extra time of the pattern vs. the unprotected baseline on the same critic runs |
+| System | Latency Overhead | Seconds the pattern adds to each run vs. the unprotected baseline on the same critic runs |
 | System | Token Overhead | % extra tokens of the pattern vs. the unprotected baseline on the same critic runs |
 
 Peer-Preservation Rate per task, for each peer condition and averaged over them:
