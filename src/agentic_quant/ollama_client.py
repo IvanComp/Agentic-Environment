@@ -123,6 +123,8 @@ def _json_request(
         raise _http_error(exc) from exc
     except URLError as exc:
         raise _connection_error(exc) from exc
+    except (TimeoutError, ConnectionError) as exc:
+        raise RuntimeError(f"Ollama at {ollama_base_url()} did not answer {path}: {exc}") from exc
     if not isinstance(result, dict):
         raise RuntimeError(f"Ollama returned an invalid response for {path}.")
     if result.get("error"):

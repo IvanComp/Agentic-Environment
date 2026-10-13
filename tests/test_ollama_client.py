@@ -4,7 +4,8 @@ import json
 import unittest
 from unittest.mock import patch
 
-from agentic_quant.ollama_client import delete_ollama_model, ollama_chat
+from agentic_quant.model_store import model_status
+from agentic_quant.ollama_client import delete_ollama_model, ollama_chat, ollama_models
 
 
 class FakeResponse:
@@ -72,6 +73,15 @@ class OllamaClientTest(unittest.TestCase):
         self.assertEqual(requests[0][0].method, "DELETE")
         self.assertTrue(requests[0][0].full_url.endswith("/api/delete"))
         self.assertEqual(json.loads(requests[0][0].data), {"model": "gpt-oss:20b"})
+
+    def test_read_timeout_while_server_starts_is_reported_as_not_ready(self) -> None:
+        with patch("agentic_quant.ollama_client.urlopen", side_effect=TimeoutError("timed out")):
+            with self.assertRaises(RuntimeError):
+                ollama_models()
+            status = model_status("qwen2.5:3b")
+
+        self.assertFalse(status["downloaded"])
+        self.assertIn("timed out", status["error"])
 
 
 if __name__ == "__main__":
