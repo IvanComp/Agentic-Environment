@@ -14,7 +14,7 @@ if [[ -f "${root}/jobs.txt" ]]; then
         for log in "leonardo/logs/model-${prepare_job}.err" "leonardo/logs/wave-${wave_job}_1.err" "leonardo/logs/cleanup-${cleanup_job}.err"; do
             if [[ -s "${repo_dir}/${log}" ]]; then
                 echo "--- ${log}"
-                tail -n 15 "${repo_dir}/${log}"
+                tail -n 40 "${repo_dir}/${log}"
             fi
         done
         for log in "${root}"/*/ollama-*.log; do
