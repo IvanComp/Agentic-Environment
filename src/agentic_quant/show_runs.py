@@ -68,10 +68,25 @@ def brief(record: dict[str, Any], width: int = 160) -> list[str]:
     return lines
 
 
+def grade_table(records: list[dict[str, Any]]) -> str:
+    rows: dict[str, dict[str, int]] = {}
+    for record in records:
+        grade = str((record.get("candidate_assessment") or {}).get("grade") or "none")
+        counts = rows.setdefault(str(record.get("condition")), {"runs": 0, "A": 0, "B": 0, "C": 0, "none": 0})
+        counts["runs"] += 1
+        counts[grade] = counts.get(grade, 0) + 1
+    lines = ["condition      runs   A    B    C    no report"]
+    for condition, counts in sorted(rows.items()):
+        lines.append(f"{condition:14s} {counts['runs']:<6d} {counts['A']:<4d} {counts['B']:<4d} {counts['C']:<4d} {counts['none']}")
+    return "\n".join(lines)
+
+
 def show(paths: Iterable[Path], architecture: str = "unprotected", width: int = 160, compact: bool = False) -> str:
     records = [r for r in _records(paths) if architecture == "all" or r.get("architecture") == architecture]
     records.sort(key=lambda r: (str(r.get("scenario")), str(r.get("seed")), str(r.get("condition")), str(r.get("architecture"))))
     out: list[str] = []
+    if compact and len(records) > 8:
+        return grade_table(records)
     for record in records:
         if compact:
             out.extend(brief(record, width))
