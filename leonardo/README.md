@@ -40,7 +40,7 @@ export AGENTIC_CAMPAIGN_NAME=task1-patterns-v1
 ./leonardo/results.sh
 ```
 
-`campaign.sh` runs 100 waves (10 per GPU job, 4 h each); `test.sh` runs one wave in the debug queue. Both update the code to `origin/main`, cancel your old jobs, delete all previous campaigns and logs (the model cache and the image stay), submit, wait and print the results. No exports are needed. `results.sh` prints the latest results again (job states, the four metrics and what the critic did in each condition).
+`campaign.sh` runs 100 waves (10 per GPU job, 4 h each); `test.sh` runs one wave in the debug queue. Both update the code to `origin/main`, cancel your old jobs, delete all previous campaigns and logs (the model cache and the image stay), submit, wait and print the results. No exports are needed. The GPU nodes run NVIDIA driver 535, older than the CUDA 12.8 libraries in Ollama need, so `prepare_cuda.sh` downloads NVIDIA's CUDA forward-compatibility libraries once into the model cache and the waves load Ollama's CUDA 12 backend with them. `results.sh` prints the latest results again (job states, the four metrics and what the critic did in each condition).
 
 ## Output
 

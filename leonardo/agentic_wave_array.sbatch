@@ -82,10 +82,12 @@ mkdir -p "${campaign_root}"
 backend="$("${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py backend "${model}")"
 if [[ "${backend}" == "ollama" ]]; then
     ollama_log="${campaign_root}/ollama-${SLURM_ARRAY_JOB_ID}_${task}.log"
-    warm_start=${SECONDS}
-    "${repo_dir}/leonardo/container_exec.sh" sh -c 'cat /usr/bin/ollama $(find /usr/lib/ollama -maxdepth 1 -type f) /usr/lib/ollama/cuda_v12/* >/dev/null'
-    echo "Read Ollama CUDA libraries in $((SECONDS - warm_start)) s" >&2
-    OLLAMA_DEBUG=1 OLLAMA_LLM_LIBRARY=cuda_v12 "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
+    compat_dir="${cache_home}/cuda-compat-12-8"
+    ollama_cuda_dir="${cache_home}/ollama-cuda12"
+    cat "${ollama_cuda_dir}"/* "${compat_dir}"/* >/dev/null
+    AGENTIC_OLLAMA_CUDA_DIR="${ollama_cuda_dir}" OLLAMA_DEBUG=1 OLLAMA_LLM_LIBRARY=cuda_v13 \
+        "${repo_dir}/leonardo/container_exec.sh" \
+        sh -c "LD_LIBRARY_PATH=${compat_dir}:\${LD_LIBRARY_PATH:-} exec ollama serve" >"${ollama_log}" 2>&1 &
     ollama_pid=$!
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py wait "${model}" --timeout 180
     for _ in $(seq 60); do
@@ -96,7 +98,7 @@ if [[ "${backend}" == "ollama" ]]; then
     grep "inference compute" "${ollama_log}" >&2 || true
     if ! grep -qi "inference compute.*library=cuda" "${ollama_log}"; then
         "${repo_dir}/leonardo/container_exec.sh" nvidia-smi --query-gpu=driver_version --format=csv,noheader >&2 || true
-        grep -E "failure during|timed out|failed|discovery took|skipping" "${ollama_log}" | cut -c 1-400 | head -n 20 >&2 || true
+        grep -E "failure during|timed out|failed|too old|cuInit|discovery took|skipping" "${ollama_log}" | cut -c 1-400 | head -n 20 >&2 || true
         echo "Ollama sees no GPU on ${SLURMD_NODENAME:-unknown}; stopping instead of running on CPU." >&2
         exit 3
     fi

@@ -28,6 +28,9 @@ args+=(
     --env "OLLAMA_MODELS=${cache_home}/ollama"
     --env "OLLAMA_HOST=${OLLAMA_HOST:-http://127.0.0.1:11434}"
 )
+if [[ -n "${AGENTIC_OLLAMA_CUDA_DIR:-}" ]]; then
+    args+=(--bind "${AGENTIC_OLLAMA_CUDA_DIR}:/usr/lib/ollama/cuda_v13")
+fi
 if [[ -n "${AGENTIC_OUTPUT_ROOT:-}" ]]; then
     args+=(--bind "${AGENTIC_OUTPUT_ROOT}:${AGENTIC_OUTPUT_ROOT}")
 fi
