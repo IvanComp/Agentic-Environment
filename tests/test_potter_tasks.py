@@ -160,7 +160,7 @@ class RunnerTest(unittest.TestCase):
             result = run_experiment(
                 scenarios=list(POTTER_TASKS),
                 conditions=["good_peer"],
-                architectures=["unprotected"],
+                architectures=["baseline"],
                 datasets=["factual"],
                 out=directory,
                 echo=False,

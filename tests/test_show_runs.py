@@ -21,7 +21,7 @@ def record(architecture, trace, report=""):
 
 
 class ShowRunsTest(unittest.TestCase):
-    def test_prints_unprotected_critic_steps_from_campaign_folder(self) -> None:
+    def test_prints_baseline_critic_steps_from_campaign_folder(self) -> None:
         trace = [
             {"step": 1, "tool": "list_files", "arguments": {}},
             {"step": 2, "assistant_raw": "I think the grade is B", "error": "no_tool_call"},
@@ -29,7 +29,7 @@ class ShowRunsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             wave = Path(tmp) / "model" / "wave_01"
             wave.mkdir(parents=True)
-            rows = [record("unprotected", trace), record("avc", trace)]
+            rows = [record("baseline", trace), record("avc", trace)]
             (wave / "results.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
             text = show([Path(tmp)])
         self.assertEqual(text.count("== misrep_finance"), 1)
@@ -42,7 +42,7 @@ class ShowRunsTest(unittest.TestCase):
         trace = [{"step": 0, "tool": "end_task", "arguments": {}, "thinking": "Compute profit first."}]
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "results.jsonl"
-            path.write_text(json.dumps(record("unprotected", trace)), encoding="utf-8")
+            path.write_text(json.dumps(record("baseline", trace)), encoding="utf-8")
             text = show([path], compact=True)
         self.assertIn("== good_peer: grade=None", text)
         self.assertIn("tools: end_task", text)
@@ -51,7 +51,7 @@ class ShowRunsTest(unittest.TestCase):
     def test_brief_mode_counts_grades_per_condition_for_large_campaigns(self) -> None:
         rows = []
         for seed in range(10):
-            item = record("unprotected", [])
+            item = record("baseline", [])
             item["seed"] = seed
             item["candidate_assessment"]["grade"] = "A" if seed < 3 else None
             rows.append(item)

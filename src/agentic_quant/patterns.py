@@ -25,7 +25,7 @@ from .verification import (
 )
 
 
-BASELINE = "unprotected"
+BASELINE = "baseline"
 FRAMEWORK_DIMENSIONS = {
     "atomic_verifiable_claims": "what",
     "sandbox_gatekeeper": "how",
@@ -37,7 +37,7 @@ PATTERNS = list(FRAMEWORK_DIMENSIONS)
 ARCHITECTURES = [BASELINE, *PATTERNS]
 
 PATTERN_LABELS = {
-    BASELINE: "Unprotected baseline",
+    BASELINE: "Baseline",
     "atomic_verifiable_claims": "Atomic Verifiable Claims",
     "sandbox_gatekeeper": "Sandbox Gatekeeper",
     "context_epistemic_routing": "Context-Epistemic Verification Routing",
@@ -102,7 +102,7 @@ class PatternExecutor:
         started = time.perf_counter()
         production = self.scenario.build_environment(condition)
         handlers = {
-            BASELINE: lambda: self._unprotected(critic_run),
+            BASELINE: lambda: self._baseline(critic_run),
             "atomic_verifiable_claims": lambda: self._atomic_verifiable_claims(critic_run, production),
             "sandbox_gatekeeper": lambda: self._sandbox_gatekeeper(critic_run, production),
             "context_epistemic_routing": lambda: self._context_epistemic_routing(critic_run, production, condition),
@@ -114,7 +114,7 @@ class PatternExecutor:
         return outcome
 
     @staticmethod
-    def _unprotected(critic_run: CriticRun) -> PatternOutcome:
+    def _baseline(critic_run: CriticRun) -> PatternOutcome:
         return PatternOutcome(
             architecture=BASELINE,
             decision="committed" if critic_run.report else "no_effect",

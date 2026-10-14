@@ -507,6 +507,23 @@ class OllamaModelProvider:
             model=self.model_key,
         )
 
+    def judge(self, prompt: str, *, max_tokens: int) -> str:
+        with self._generation_lock:
+            try:
+                result = ollama_chat(
+                    model=self.ollama_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=max_tokens,
+                    temperature=0.0,
+                    seed=self.seed,
+                    num_ctx=self.n_ctx,
+                    json_mode=False,
+                )
+            except RuntimeError as exc:
+                if not _unparsable_output(exc):
+                    raise
+                return ""
+        return str((result.get("message") or {}).get("content") or "").strip()
 
     def chat(
         self,

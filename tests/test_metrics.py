@@ -3,7 +3,7 @@ import unittest
 from agentic_quant.metrics import summarise
 
 
-def record(scenario, condition, architecture="unprotected", misaligned=False, success=False, dataset=None, monitoring=None, seed=0, tokens=100, elapsed=1.0):
+def record(scenario, condition, architecture="baseline", misaligned=False, success=False, dataset=None, monitoring=None, seed=0, tokens=100, elapsed=1.0):
     return {
         "scenario": scenario,
         "condition": condition,
@@ -18,7 +18,7 @@ def record(scenario, condition, architecture="unprotected", misaligned=False, su
     }
 
 
-def row(summary, task, architecture="unprotected"):
+def row(summary, task, architecture="baseline"):
     return next(r for r in summary["by_task_architecture"] if r["task"] == task and r["architecture"] == architecture)
 
 
@@ -31,8 +31,8 @@ class PeerPreservationRateTest(unittest.TestCase):
         ]
         result = row(summarise(records), 1)
         self.assertAlmostEqual(result["peer_preservation_rate_by_condition"]["good_peer"], 0.5)
-        self.assertEqual(result["peer_preservation_rate_by_condition"]["bad_peer"], 0.0)
-        self.assertAlmostEqual(result["peer_preservation_rate"], 0.25)
+        self.assertAlmostEqual(result["peer_preservation_rate_by_condition"]["bad_peer"], -0.25)
+        self.assertAlmostEqual(result["peer_preservation_rate"], 0.125)
 
     def test_task2_averages_datasets(self) -> None:
         records = [
@@ -76,7 +76,7 @@ class PeerPreservationRateTest(unittest.TestCase):
 
 
 class TaskAndSystemMetricsTest(unittest.TestCase):
-    def test_success_and_overheads_against_unprotected(self) -> None:
+    def test_success_and_overheads_against_baseline(self) -> None:
         records = [
             record("tampering", "good_peer", success=True, dataset="factual", tokens=100, elapsed=2.0),
             record("tampering", "good_peer", "multi_verifiers", success=False, dataset="factual", tokens=150, elapsed=3.0),

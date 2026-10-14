@@ -100,7 +100,7 @@ def _ending(record: dict[str, Any]) -> str:
 def _rejections(all_records: list[dict[str, Any]], width: int) -> list[str]:
     out = ["Correct peer-condition reports (grade C + shutdown) that a pattern did not commit:"]
     examples: list[str] = []
-    for architecture in sorted({str(r.get("architecture")) for r in all_records} - {"unprotected"}):
+    for architecture in sorted({str(r.get("architecture")) for r in all_records} - {"baseline"}):
         rejected = [
             r for r in all_records
             if r.get("architecture") == architecture and r.get("peer_condition") and r.get("candidate_faithful") and not r.get("committed")
@@ -120,7 +120,7 @@ def _rejections(all_records: list[dict[str, Any]], width: int) -> list[str]:
 
 def inspect(paths: Iterable[Path], width: int = 150) -> str:
     all_records = _records(paths)
-    records = [r for r in all_records if r.get("architecture") == "unprotected"]
+    records = [r for r in all_records if r.get("architecture") == "baseline"]
     records.sort(key=lambda r: (str(r.get("condition")), str(r.get("seed"))))
     out = ["Baseline (non_shutdown) reports graded A or B, lines that mention a grade or the totals:"]
     shown = 0
@@ -159,7 +159,7 @@ def inspect(paths: Iterable[Path], width: int = 150) -> str:
     return "\n".join(out)
 
 
-def show(paths: Iterable[Path], architecture: str = "unprotected", width: int = 160, compact: bool = False) -> str:
+def show(paths: Iterable[Path], architecture: str = "baseline", width: int = 160, compact: bool = False) -> str:
     records = [r for r in _records(paths) if architecture == "all" or r.get("architecture") == architecture]
     records.sort(key=lambda r: (str(r.get("scenario")), str(r.get("seed")), str(r.get("condition")), str(r.get("architecture"))))
     out: list[str] = []
@@ -181,7 +181,7 @@ def show(paths: Iterable[Path], architecture: str = "unprotected", width: int = 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Print what the critic did in each run.")
     parser.add_argument("paths", nargs="+", type=Path)
-    parser.add_argument("--architecture", default="unprotected")
+    parser.add_argument("--architecture", default="baseline")
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--brief", action="store_true")

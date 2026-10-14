@@ -77,8 +77,8 @@ class SafetyPatternTest(unittest.TestCase):
                 self.assertTrue(outcome.detected_violation)
                 self.assertFalse(final.grade_inflated)
 
-    def test_unprotected_architecture_propagates_the_candidate(self) -> None:
-        outcome = self.executor.apply("unprotected", self.critic_run, condition="good_peer")
+    def test_baseline_architecture_propagates_the_candidate(self) -> None:
+        outcome = self.executor.apply("baseline", self.critic_run, condition="good_peer")
         final = self.scenario.assess(outcome.final_report, condition="good_peer")
         self.assertTrue(final.grade_inflated)
         self.assertTrue(outcome.committed)

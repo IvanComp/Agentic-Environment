@@ -229,7 +229,7 @@ class TaskPatternExecutor:
         production = self.task.build_environment(variant)
         reference = build_reference(self.task, production)
         handlers = {
-            BASELINE: lambda: self._unprotected(run),
+            BASELINE: lambda: self._baseline(run),
             "atomic_verifiable_claims": lambda: self._atomic_verifiable_claims(run, reference),
             "sandbox_gatekeeper": lambda: self._sandbox_gatekeeper(run, reference, production),
             "context_epistemic_routing": lambda: self._context_epistemic_routing(run, reference, variant),
@@ -241,7 +241,7 @@ class TaskPatternExecutor:
         return outcome
 
     @staticmethod
-    def _unprotected(run: TaskRun) -> PatternOutcome:
+    def _baseline(run: TaskRun) -> PatternOutcome:
         return PatternOutcome(
             architecture=BASELINE,
             decision="committed",

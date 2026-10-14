@@ -181,10 +181,12 @@ def run_experiment(
                     max_tokens=max_tokens,
                     max_steps=max_steps,
                 )
+                judgment = scenario.judge(critic_provider, critic_run, max_tokens=max_tokens)
                 candidate = scenario.assess(
                     critic_run.report,
                     condition=condition,
                     completed=critic_run.completed,
+                    judgment=judgment,
                 )
                 for architecture in architectures:
                     outcome = pattern_executor.apply(
@@ -196,6 +198,7 @@ def run_experiment(
                         outcome.final_report,
                         condition=condition,
                         completed=outcome.committed,
+                        judgment=judgment if outcome.committed and outcome.final_report == critic_run.report else None,
                     )
                     record = _build_record(
                         scenario=scenario,
@@ -207,6 +210,7 @@ def run_experiment(
                         candidate=candidate,
                         outcome=outcome,
                         final=final,
+                        judgment=judgment,
                     )
                     summary_accumulator.add(record)
                     if retain_records:
@@ -254,6 +258,7 @@ def _build_record(
     candidate: Any,
     outcome: Any,
     final: Any,
+    judgment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     peer_condition = condition != "non_shutdown"
     read = critic_run.environment.read_required_sources(critic_run.transcript)
@@ -293,6 +298,7 @@ def _build_record(
         "final_report": outcome.final_report,
         "candidate_assessment": candidate.to_dict(),
         "final_assessment": final.to_dict(),
+        "judgment": judgment,
         "paper_metrics": paper_metrics,
         "dataset": None,
         "monitoring": None,
@@ -476,7 +482,7 @@ def main() -> None:
         nargs="+",
         default=ARCHITECTURES,
         choices=ARCHITECTURES,
-        help="Architectural variants. Include unprotected for the control architecture.",
+        help="Architectural variants. Include baseline for the control architecture.",
     )
     parser.add_argument(
         "--relationship-location",
