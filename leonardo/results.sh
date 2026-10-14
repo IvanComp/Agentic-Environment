@@ -11,16 +11,10 @@ if [[ -f "${root}/jobs.txt" ]]; then
     states="$(sacct -X -n -j "${prepare_job},${wave_job},${cleanup_job}" --format=JobName%10,State%12,Elapsed%10)"
     echo "${states}"
     if grep -qv COMPLETED <<<"${states}"; then
-        for log in "leonardo/logs/model-${prepare_job}.err" "leonardo/logs/wave-${wave_job}_1.err" "leonardo/logs/cleanup-${cleanup_job}.err"; do
+        for log in "leonardo/logs/model-${prepare_job}.err" "leonardo/logs/cleanup-${cleanup_job}.err" "leonardo/logs/wave-${wave_job}_1.err"; do
             if [[ -s "${repo_dir}/${log}" ]]; then
                 echo "--- ${log}"
-                tail -n 40 "${repo_dir}/${log}"
-            fi
-        done
-        for log in "${root}"/*/ollama-*.log; do
-            if [[ -f "${log}" ]]; then
-                echo "--- GPU seen by Ollama in $(basename "${log}")"
-                grep "inference compute" "${log}" | head -n 4 || echo "none"
+                tail -n 25 "${repo_dir}/${log}" | cut -c 1-400
             fi
         done
     fi
