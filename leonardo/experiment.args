@@ -1,9 +1,9 @@
 --ctx
-16384
+32768
 --temperature
 1.0
 --max-tokens
-4096
+8192
 --max-steps
 30
 --conditions

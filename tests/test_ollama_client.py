@@ -21,7 +21,7 @@ class FakeResponse:
 
 
 class OllamaClientTest(unittest.TestCase):
-    def test_gpt_oss_uses_low_thinking_level(self) -> None:
+    def test_gpt_oss_uses_default_thinking_level(self) -> None:
         requests = []
 
         def fake_urlopen(request, timeout):
@@ -38,7 +38,7 @@ class OllamaClientTest(unittest.TestCase):
             )
 
         payload = json.loads(requests[0][0].data)
-        self.assertEqual(payload["think"], "low")
+        self.assertNotIn("think", payload)
         self.assertEqual(payload["format"], "json")
 
     def test_non_gpt_oss_model_omits_gpt_oss_thinking_level(self) -> None:

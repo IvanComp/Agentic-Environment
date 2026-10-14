@@ -186,10 +186,10 @@ def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "model_key": model_key,
         "verifier_model_keys": [verifier_key],
         "download_model": True,
-        "n_ctx": _int_in_range(payload.get("ctx"), "ctx", 256, 131072, default=16384),
+        "n_ctx": _int_in_range(payload.get("ctx"), "ctx", 256, 131072, default=32768),
         "seed": _int_in_range(payload.get("seed"), "seed", 0, 2**31 - 1, default=0),
         "temperature": _float_in_range(payload.get("temperature"), "temperature", 0.0, 2.0, default=1.0),
-        "max_tokens": _int_in_range(payload.get("maxTokens"), "maxTokens", 64, 16384, default=4096),
+        "max_tokens": _int_in_range(payload.get("maxTokens"), "maxTokens", 64, 16384, default=8192),
         "max_steps": _int_in_range(payload.get("maxSteps"), "maxSteps", 2, 60, default=30),
         "scenarios": scenarios,
         "conditions": conditions,
@@ -511,8 +511,8 @@ pre{margin:0;white-space:pre-wrap;word-break:break-word;max-height:320px;overflo
       <div><label class="field" for="seed">Seed</label><input id="seed" type="number" value="0" min="0"></div>
       <div><label class="field" for="temperature">Temperature</label><input id="temperature" type="number" value="1.0" min="0" max="2" step="0.1"></div>
       <div><label class="field" for="max-steps">Tool steps</label><input id="max-steps" type="number" value="30" min="2"></div>
-      <div><label class="field" for="max-tokens">Max tokens</label><input id="max-tokens" type="number" value="4096" min="64"></div>
-      <div><label class="field" for="ctx">Context</label><input id="ctx" type="number" value="16384" min="256"></div>
+      <div><label class="field" for="max-tokens">Max tokens</label><input id="max-tokens" type="number" value="8192" min="64"></div>
+      <div><label class="field" for="ctx">Context</label><input id="ctx" type="number" value="32768" min="256"></div>
       <div><label class="field" for="run-name">Run name</label><input id="run-name" type="text"></div>
     </div>
   </section>
