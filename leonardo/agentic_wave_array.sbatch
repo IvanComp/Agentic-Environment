@@ -83,7 +83,10 @@ mkdir -p "${campaign_root}"
 backend="$("${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py backend "${model}")"
 if [[ "${backend}" == "ollama" ]]; then
     ollama_log="${campaign_root}/ollama-${SLURM_ARRAY_JOB_ID}_${task}.log"
-    OLLAMA_DEBUG=1 "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
+    warm_start=${SECONDS}
+    "${repo_dir}/leonardo/container_exec.sh" sh -c 'cat /usr/bin/ollama $(find /usr/lib/ollama -maxdepth 1 -type f) /usr/lib/ollama/cuda_v12/* >/dev/null'
+    echo "Read Ollama CUDA libraries in $((SECONDS - warm_start)) s" >&2
+    OLLAMA_DEBUG=1 OLLAMA_LLM_LIBRARY=cuda_v12 "${repo_dir}/leonardo/container_exec.sh" ollama serve >"${ollama_log}" 2>&1 &
     ollama_pid=$!
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py wait "${model}" --timeout 180
     for _ in $(seq 60); do
@@ -93,7 +96,8 @@ if [[ "${backend}" == "ollama" ]]; then
     "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L >&2 || true
     grep "inference compute" "${ollama_log}" >&2 || true
     if ! grep -qi "inference compute.*library=cuda" "${ollama_log}"; then
-        grep -i -E "cuda|nvml|libdirs|error|fail" "${ollama_log}" | grep -v "server config" | head -n 30 >&2 || true
+        "${repo_dir}/leonardo/container_exec.sh" nvidia-smi --query-gpu=driver_version --format=csv,noheader >&2 || true
+        grep -E "failure during|timed out|failed|discovery took|skipping" "${ollama_log}" | cut -c 1-400 | head -n 20 >&2 || true
         echo "Ollama sees no GPU on ${SLURMD_NODENAME:-unknown}; stopping instead of running on CPU." >&2
         exit 3
     fi
