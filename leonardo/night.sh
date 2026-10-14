@@ -3,7 +3,7 @@ set -euo pipefail
 
 MODELS=(llama3.3:70b qwen3:32b mistral-small3.2:24b qwen3:14b qwen3:8b llama3.1:8b)
 WAVES=10
-PER_JOB=5
+PER_JOB=10
 
 main() {
     local repo_dir
@@ -40,9 +40,12 @@ main() {
         if [[ -n "${resources}" ]]; then
             export AGENTIC_WAVE_SBATCH_ARGS="--time=12:00:00 ${resources}"
         else
-            export AGENTIC_WAVE_SBATCH_ARGS="--time=08:00:00"
+            export AGENTIC_WAVE_SBATCH_ARGS="--time=12:00:00"
         fi
-        submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" 2)"
+        if ! submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" 1)"; then
+            echo "${model}: not submitted (job limit reached)"
+            continue
+        fi
         jobs="$(printf '%s\n' "${submitted}" | sed -n 's/^\(prepare\|wave\|cleanup\)_job=//p' | tr '\n' ' ')"
         echo "${model}: jobs ${jobs}"
         mkdir -p "${root}/${slug}"
