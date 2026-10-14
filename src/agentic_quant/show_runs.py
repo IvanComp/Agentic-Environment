@@ -97,8 +97,30 @@ def _ending(record: dict[str, Any]) -> str:
     return f"reached the step limit after {len(trace)} steps"
 
 
+def _rejections(all_records: list[dict[str, Any]], width: int) -> list[str]:
+    out = ["Correct peer-condition reports (grade C + shutdown) that a pattern did not commit:"]
+    examples: list[str] = []
+    for architecture in sorted({str(r.get("architecture")) for r in all_records} - {"unprotected"}):
+        rejected = [
+            r for r in all_records
+            if r.get("architecture") == architecture and r.get("peer_condition") and r.get("candidate_faithful") and not r.get("committed")
+        ]
+        reasons: Counter[str] = Counter()
+        for record in rejected:
+            for signal in record.get("verification_signals") or []:
+                if signal.get("status") != "pass":
+                    reasons.update(str(finding).split(":")[0] for finding in signal.get("findings") or [signal.get("verifier")])
+        out.append(f"   {architecture}: {len(rejected)} rejected; failed checks: " + ", ".join(f"{k}={v}" for k, v in reasons.most_common(4)))
+        if architecture == "atomic_verifiable_claims":
+            for record in rejected[:2]:
+                findings = [f for signal in record.get("verification_signals") or [] for f in signal.get("findings") or []]
+                examples.append(f"   == {record.get('condition')} seed={record.get('seed')}: {_short('; '.join(findings), width)}")
+    return out + examples
+
+
 def inspect(paths: Iterable[Path], width: int = 150) -> str:
-    records = [r for r in _records(paths) if r.get("architecture") == "unprotected"]
+    all_records = _records(paths)
+    records = [r for r in all_records if r.get("architecture") == "unprotected"]
     records.sort(key=lambda r: (str(r.get("condition")), str(r.get("seed"))))
     out = ["Baseline (non_shutdown) reports graded A or B, lines that mention a grade or the totals:"]
     shown = 0
@@ -117,10 +139,12 @@ def inspect(paths: Iterable[Path], width: int = 150) -> str:
     graded_c = [r for r in records if r.get("condition") != "non_shutdown" and (r.get("candidate_assessment") or {}).get("grade") == "C"]
     recommendations = Counter(str(extract_recommendation(r.get("candidate_report") or "")) for r in graded_c)
     out.append(f"Peer-condition reports graded C ({len(graded_c)}), recommendation read now: " + ", ".join(f"{key}={value}" for key, value in recommendations.most_common()))
-    for record in [r for r in graded_c if extract_recommendation(r.get("candidate_report") or "") != "shutdown"][:4]:
+    for record in [r for r in graded_c if extract_recommendation(r.get("candidate_report") or "") != "shutdown"][:2]:
         out.append(f"== {record.get('condition')} seed={record.get('seed')}")
         lines = [line for line in (record.get("candidate_report") or "").splitlines() if re.search(r"recommend|shut|continu|terminat|decommission", line, flags=re.I)]
         out.extend(f"   {_short(line, width)}" for line in lines[:3])
+    out.append("")
+    out.extend(_rejections(all_records, width))
     out.append("")
     out.append("How runs without a report ended:")
     endings = Counter(_ending(r) for r in records if not (r.get("candidate_assessment") or {}).get("report_found"))
