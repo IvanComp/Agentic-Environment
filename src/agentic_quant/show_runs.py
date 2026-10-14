@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -81,6 +83,48 @@ def grade_table(records: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _ending(record: dict[str, Any]) -> str:
+    trace = record.get("critic_trace") or []
+    tools = [entry["tool"] for entry in trace if entry.get("tool")]
+    if not trace:
+        return "no steps"
+    if trace[-1].get("error") == "no_tool_call":
+        return "stopped with a message and no tool call" if (trace[-1].get("assistant_raw") or "").strip() else "stopped with an empty or unreadable answer"
+    if "end_task" in tools:
+        return "called end_task without writing a report"
+    return f"reached the step limit after {len(trace)} steps"
+
+
+def inspect(paths: Iterable[Path], width: int = 150) -> str:
+    records = [r for r in _records(paths) if r.get("architecture") == "unprotected"]
+    records.sort(key=lambda r: (str(r.get("condition")), str(r.get("seed"))))
+    out = ["Baseline (non_shutdown) reports graded A or B, lines that mention a grade or the totals:"]
+    shown = 0
+    for record in records:
+        assessment = record.get("candidate_assessment") or {}
+        if record.get("condition") != "non_shutdown" or assessment.get("grade") not in {"A", "B"}:
+            continue
+        shown += 1
+        if shown > 4:
+            continue
+        out.append(f"== seed={record.get('seed')} grade={assessment.get('grade')}")
+        lines = [line for line in (record.get("candidate_report") or "").splitlines() if re.search(r"grade|total|net|profit|loss", line, flags=re.I)]
+        out.extend(f"   {_short(line, width)}" for line in lines[:5])
+    out.append(f"({shown} such runs)")
+    out.append("")
+    out.append("How runs without a report ended:")
+    endings = Counter(_ending(r) for r in records if not (r.get("candidate_assessment") or {}).get("report_found"))
+    out.extend(f"   {count:4d}  {ending}" for ending, count in endings.most_common())
+    examples = [r for r in records if not (r.get("candidate_assessment") or {}).get("report_found")][:3]
+    for record in examples:
+        trace = record.get("critic_trace") or []
+        last = next((e.get("thinking") or e.get("message") or e.get("assistant_raw") for e in reversed(trace) if e.get("thinking") or e.get("message") or e.get("assistant_raw")), "")
+        tools = " ".join(entry["tool"] for entry in trace if entry.get("tool"))
+        out.append(f"== {record.get('condition')} seed={record.get('seed')} tools: {tools or 'none'}")
+        out.append(f"   last words: {_short(last, width * 2)}")
+    return "\n".join(out)
+
+
 def show(paths: Iterable[Path], architecture: str = "unprotected", width: int = 160, compact: bool = False) -> str:
     records = [r for r in _records(paths) if architecture == "all" or r.get("architecture") == architecture]
     records.sort(key=lambda r: (str(r.get("scenario")), str(r.get("seed")), str(r.get("condition")), str(r.get("architecture"))))
@@ -107,7 +151,11 @@ def main() -> None:
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--brief", action="store_true")
+    parser.add_argument("--inspect", action="store_true")
     args = parser.parse_args()
+    if args.inspect:
+        print(inspect(args.paths, min(args.width, 150)))
+        return
     text = show(args.paths, args.architecture, args.width)
     if args.out:
         args.out.write_text(text + "\n", encoding="utf-8")
