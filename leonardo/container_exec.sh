@@ -26,6 +26,7 @@ args+=(
     --env "AGENTIC_QUANT_HOME=${cache_home}"
     --env "AGENTIC_QUANT_MODELS_DIR=${cache_home}/models"
     --env "OLLAMA_MODELS=${cache_home}/ollama"
+    --env "OLLAMA_NOPRUNE=1"
     --env "OLLAMA_HOST=${OLLAMA_HOST:-http://127.0.0.1:11434}"
 )
 if [[ -n "${AGENTIC_OLLAMA_CUDA_DIR:-}" ]]; then
