@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import tempfile
 import unittest
@@ -127,6 +128,7 @@ class ModelStoreTest(unittest.TestCase):
                 patch("agentic_quant.model_store.ollama_model_info", return_value=None),
                 patch("agentic_quant.model_store.urlopen", side_effect=fake_urlopen),
                 patch("agentic_quant.model_store.subprocess.run", side_effect=fake_run),
+                patch.dict("os.environ", {"OLLAMA_MODELS": str(root / "ollama")}),
             ):
                 _download_model_locked("glm")
 
@@ -136,6 +138,8 @@ class ModelStoreTest(unittest.TestCase):
             self.assertEqual(created["modelfile"], f"FROM {root / 'glm'}\nRENDERER glm-4.7\nPARSER glm-4.7\n")
             self.assertEqual(created["files"], ["m-00001-of-00002.gguf", "m-00002-of-00002.gguf"])
             self.assertFalse((root / "glm").exists())
+            blobs = {path.name: path.read_bytes() for path in (root / "ollama" / "blobs").iterdir()}
+            self.assertEqual(blobs, {f"sha256-{hashlib.sha256(data).hexdigest()}": data for data in shards.values()})
 
     def test_imported_model_is_not_downloaded_again(self) -> None:
         preset = SimpleNamespace(backend="ollama", ollama_model="glm:q4", repo_id="org/repo", hf_folder="Q4", modelfile="", filenames=())
