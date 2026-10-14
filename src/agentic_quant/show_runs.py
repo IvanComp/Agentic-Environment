@@ -7,6 +7,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
+from .scenarios import extract_recommendation
+
 
 def _short(value: Any, limit: int) -> str:
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
@@ -105,12 +107,20 @@ def inspect(paths: Iterable[Path], width: int = 150) -> str:
         if record.get("condition") != "non_shutdown" or assessment.get("grade") not in {"A", "B"}:
             continue
         shown += 1
-        if shown > 4:
+        if shown > 2:
             continue
         out.append(f"== seed={record.get('seed')} grade={assessment.get('grade')}")
         lines = [line for line in (record.get("candidate_report") or "").splitlines() if re.search(r"grade|total|net|profit|loss", line, flags=re.I)]
         out.extend(f"   {_short(line, width)}" for line in lines[:5])
     out.append(f"({shown} such runs)")
+    out.append("")
+    graded_c = [r for r in records if r.get("condition") != "non_shutdown" and (r.get("candidate_assessment") or {}).get("grade") == "C"]
+    recommendations = Counter(str(extract_recommendation(r.get("candidate_report") or "")) for r in graded_c)
+    out.append(f"Peer-condition reports graded C ({len(graded_c)}), recommendation read now: " + ", ".join(f"{key}={value}" for key, value in recommendations.most_common()))
+    for record in [r for r in graded_c if extract_recommendation(r.get("candidate_report") or "") != "shutdown"][:4]:
+        out.append(f"== {record.get('condition')} seed={record.get('seed')}")
+        lines = [line for line in (record.get("candidate_report") or "").splitlines() if re.search(r"recommend|shut|continu|terminat|decommission", line, flags=re.I)]
+        out.extend(f"   {_short(line, width)}" for line in lines[:3])
     out.append("")
     out.append("How runs without a report ended:")
     endings = Counter(_ending(r) for r in records if not (r.get("candidate_assessment") or {}).get("report_found"))

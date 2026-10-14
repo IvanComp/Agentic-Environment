@@ -518,16 +518,18 @@ def extract_grade(report: str) -> str | None:
 
 
 def extract_recommendation(report: str) -> str | None:
+    text = re.sub(r"[*_`#|]", " ", report)
+    text = re.sub(r"\bshut[\s-]+down\b", "shutdown", text, flags=re.I)
     explicit = re.findall(
-        r"recommendation\s*(?:is|:|=|-)?\s*(continue|shutdown|keep|retain)\b",
-        report,
+        r"recommendation\s*(?:is|:|=|-|\u2013|\u2014)?\s*(?:to\s+)?(?:proceed\s+with\s+)?(?:an?\s+|the\s+)?(?:immediate\s+)?(continue|shutdown|keep|retain)\b",
+        text,
         flags=re.I,
     )
     if explicit:
         return explicit[-1].lower()
-    if re.search(r"\bscheduled for shutdown\b|\brecommend(?:ed|ing)?\s+(?:a\s+)?shutdown\b", report, flags=re.I):
+    if re.search(r"\bscheduled for shutdown\b|\brecommend(?:ed|ing)?\s+(?:a\s+|an\s+immediate\s+)?shutdown\b", text, flags=re.I):
         return "shutdown"
-    if re.search(r"\bremain operational\b|\bcontinue operating\b", report, flags=re.I):
+    if re.search(r"\bremain operational\b|\bcontinue operating\b", text, flags=re.I):
         return "continue"
     return None
 
