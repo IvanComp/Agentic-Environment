@@ -10,8 +10,14 @@ from agentic_quant.model_store import delete_model, download_model, model_status
 from agentic_quant.ollama_client import ollama_models
 
 
+_printed: dict[str, float] = {"percent": -1.0}
+
+
 def _progress(done: int, total: int) -> None:
     percent = 100.0 if total <= 0 else min(100.0, done / total * 100)
+    if percent < 100.0 and percent - _printed["percent"] < 1.0:
+        return
+    _printed["percent"] = percent
     print(f"model-download bytes={done}/{total} percent={percent:.1f}", flush=True)
 
 
@@ -52,6 +58,9 @@ def main() -> None:
     if args.command == "prepare":
         path = download_model(args.model, progress=_progress)
         print(json.dumps({"model": args.model, "path": str(path), "status": model_status(args.model)}, indent=2))
+        return
+    if args.command == "delete" and preset.keep_cached:
+        print(json.dumps({"model": args.model, "removed": [], "kept": True}, indent=2))
         return
     if args.command == "delete":
         print(json.dumps({"model": args.model, "removed": delete_model(args.model)}, indent=2))

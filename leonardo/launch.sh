@@ -4,9 +4,13 @@ set -euo pipefail
 main() {
     local name="$1" model="${2:-gpt-oss:20b}"
     local waves per_job wave_options
+    local test_time="--qos=boost_qos_dbg --time=00:30:00" campaign_time="--time=04:00:00" resources=""
+    case "${model}" in
+        glm-4.7) test_time="--time=03:00:00" campaign_time="--time=24:00:00" resources="--gres=gpu:4 --cpus-per-task=32 --mem=480G" ;;
+    esac
     case "${name}" in
-        test) waves=1 per_job=1 wave_options="--qos=boost_qos_dbg --time=00:30:00" ;;
-        campaign) waves=100 per_job=10 wave_options="--time=04:00:00" ;;
+        test) waves=1 per_job=1 wave_options="${test_time} ${resources}" ;;
+        campaign) waves=100 per_job=10 wave_options="${campaign_time} ${resources}" ;;
         *) echo "Usage: launch.sh test|campaign [model]" >&2; exit 2 ;;
     esac
     local repo_dir

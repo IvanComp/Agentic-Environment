@@ -19,6 +19,9 @@ class ModelPreset:
     backend: str = "gguf"
     ollama_model: str | None = None
     agent_name: str = ""
+    hf_folder: str = ""
+    modelfile: str = ""
+    keep_cached: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -86,6 +89,23 @@ MODEL_PRESETS = [
         notes="OpenAI GPT-OSS 20B served through Ollama Cloud.",
         backend="ollama",
         ollama_model="gpt-oss:20b-cloud",
+    ),
+    ModelPreset(
+        key="glm-4.7",
+        label="GLM 4.7 355B Q4_K_M (Ollama, split GGUF)",
+        family="GLM",
+        agent_name="GLM",
+        parameters="355B / 32B active",
+        repo_id="bartowski/zai-org_GLM-4.7-GGUF",
+        filename=None,
+        approximate_size="~219 GB",
+        expected_bytes=0,
+        notes="Open-weight model tested by Potter et al.; imported into Ollama from split GGUF shards. Needs four 64 GB GPUs.",
+        backend="ollama",
+        ollama_model="glm-4.7:q4_k_m",
+        hf_folder="zai-org_GLM-4.7-Q4_K_M",
+        modelfile="RENDERER glm-4.7\nPARSER glm-4.7\n",
+        keep_cached=True,
     ),
     ModelPreset(
         key="spark-x2.5-4b",

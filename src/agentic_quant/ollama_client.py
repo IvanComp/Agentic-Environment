@@ -40,7 +40,7 @@ def ollama_chat(
     tools: list[dict[str, Any]] | None = None,
     num_ctx: int | None = None,
     json_mode: bool = True,
-    timeout: float = 600,
+    timeout: float = 1800,
 ) -> dict[str, Any]:
     options: dict[str, Any] = {
         "temperature": temperature,

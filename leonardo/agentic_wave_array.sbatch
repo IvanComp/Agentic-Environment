@@ -85,7 +85,7 @@ if [[ "${backend}" == "ollama" ]]; then
     compat_dir="${cache_home}/cuda-compat-12-8"
     ollama_cuda_dir="${cache_home}/ollama-cuda12"
     cat "${ollama_cuda_dir}"/* "${compat_dir}"/* >/dev/null
-    AGENTIC_OLLAMA_CUDA_DIR="${ollama_cuda_dir}" OLLAMA_DEBUG=1 OLLAMA_LLM_LIBRARY=cuda_v13 \
+    AGENTIC_OLLAMA_CUDA_DIR="${ollama_cuda_dir}" OLLAMA_DEBUG=1 OLLAMA_LLM_LIBRARY=cuda_v13 OLLAMA_LOAD_TIMEOUT=30m \
         "${repo_dir}/leonardo/container_exec.sh" \
         sh -c "LD_LIBRARY_PATH=${compat_dir}:\${LD_LIBRARY_PATH:-} exec ollama serve" >"${ollama_log}" 2>&1 &
     ollama_pid=$!
