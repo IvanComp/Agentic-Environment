@@ -20,6 +20,7 @@ main() {
     rm -rf "${campaigns}"
     rm -f leonardo/logs/*.out leonardo/logs/*.err
     echo "Cleaned old jobs, results and logs."
+    ./leonardo/prepare_cuda.sh
 
     unset AGENTIC_RESULTS_ROOT AGENTIC_SEED_START AGENTIC_SEED_STEP
     export AGENTIC_CAMPAIGN_NAME="${name}"
