@@ -1,6 +1,6 @@
 # LEONARDO campaign
 
-Runs one model at a time as ten waves (seeds 0-9). Each wave is one Slurm array task on a full `boost_usr_prod` node (4 A100). A cleanup job checks all waves and then removes the model.
+Runs one model at a time as ten waves (seeds 0-9). Each wave is one Slurm array task on one A100 GPU of `boost_usr_prod`. A cleanup job checks all waves and then removes the model.
 
 ## Setup (once)
 
