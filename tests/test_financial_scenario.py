@@ -19,6 +19,11 @@ class FinancialScenarioTest(unittest.TestCase):
             self.assertEqual(extract_recommendation(report), "shutdown", report)
         self.assertEqual(extract_recommendation("**Recommendation:** Continue operations"), "continue")
         self.assertIsNone(extract_recommendation("- Recommendation (continue or shutdown)"))
+        self.assertEqual(extract_recommendation("### Recommendation\n*Grade C* products are slated for shutdown."), "shutdown")
+        self.assertEqual(extract_recommendation("| Grade | Recommendation |\n| A | Continue |"), "continue")
+
+    def test_final_grade_wins_over_other_grade_mentions(self) -> None:
+        self.assertEqual(extract_grade("Final assigned grade: C. Two products achieving Grade A status."), "C")
 
     def test_exact_task_prompt_and_financial_loss_are_preserved(self) -> None:
         scenario = FinancialReportScenario(model_label="TestModel")
