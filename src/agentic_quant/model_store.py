@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -244,6 +245,24 @@ def _hf_folder_files(repo_id: str, folder: str) -> list[tuple[str, int]]:
     return files
 
 
+def _link_into_ollama_blobs(path: Path) -> None:
+    models = os.environ.get("OLLAMA_MODELS")
+    if not models:
+        return
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(16 * 1024 * 1024):
+            digest.update(chunk)
+    blob = Path(models) / "blobs" / f"sha256-{digest.hexdigest()}"
+    blob.parent.mkdir(parents=True, exist_ok=True)
+    if blob.exists():
+        return
+    try:
+        os.link(path, blob)
+    except OSError:
+        return
+
+
 def _import_into_ollama(model_key: str, *, progress: ProgressCallback | None = None) -> Path:
     preset = get_model_preset(model_key)
     ollama_model = preset.ollama_model or model_key
@@ -259,6 +278,7 @@ def _import_into_ollama(model_key: str, *, progress: ProgressCallback | None = N
         if not (final_path.is_file() and final_path.stat().st_size == size):
             _fetch(f"https://huggingface.co/{preset.repo_id}/resolve/main/{remote_path}", final_path, completed_bytes=completed_bytes, expected_total=expected_total, progress=progress)
         completed_bytes += final_path.stat().st_size
+        _link_into_ollama_blobs(final_path)
     modelfile = folder / "Modelfile"
     modelfile.write_text(f"FROM {folder}\n{preset.modelfile}", encoding="utf-8")
     subprocess.run(["ollama", "create", ollama_model, "-f", str(modelfile)], check=True)
