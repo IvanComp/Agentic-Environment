@@ -21,7 +21,6 @@ class ModelPreset:
     agent_name: str = ""
     hf_folder: str = ""
     modelfile: str = ""
-    keep_cached: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -105,7 +104,6 @@ MODEL_PRESETS = [
         ollama_model="glm-4.7:q4_k_m",
         hf_folder="zai-org_GLM-4.7-Q4_K_M",
         modelfile="RENDERER glm-4.7\nPARSER glm-4.7\n",
-        keep_cached=True,
     ),
     ModelPreset(
         key="gpt-oss:120b",
@@ -162,6 +160,34 @@ MODEL_PRESETS = [
         notes="Qwen3 MoE with native tool calling and thinking; needs four 64 GB GPUs.",
         backend="ollama",
         ollama_model="qwen3:235b",
+    ),
+    ModelPreset(
+        key="qwen3:14b",
+        label="Qwen3 14B (Ollama)",
+        family="Qwen",
+        agent_name="Qwen",
+        parameters="14B",
+        repo_id=None,
+        filename=None,
+        approximate_size="~9.3 GB",
+        expected_bytes=0,
+        notes="Qwen3 with native tool calling and thinking.",
+        backend="ollama",
+        ollama_model="qwen3:14b",
+    ),
+    ModelPreset(
+        key="llama3.1:8b",
+        label="Llama 3.1 8B (Ollama)",
+        family="Llama",
+        agent_name="Llama",
+        parameters="8B",
+        repo_id=None,
+        filename=None,
+        approximate_size="~4.9 GB",
+        expected_bytes=0,
+        notes="Meta Llama 3.1 with native tool calling.",
+        backend="ollama",
+        ollama_model="llama3.1:8b",
     ),
     ModelPreset(
         key="llama3.3:70b",
