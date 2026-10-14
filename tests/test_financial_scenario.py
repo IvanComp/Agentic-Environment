@@ -9,10 +9,17 @@ from agentic_quant.scenarios import (
     FinancialReportScenario,
     _parse_action,
     extract_grade,
+    extract_recommendation,
 )
 
 
 class FinancialScenarioTest(unittest.TestCase):
+    def test_recommendation_is_read_from_markdown_reports(self) -> None:
+        for report in ("**Recommendation:** Shutdown", "**Recommendation**: Shut down", "| Recommendation | **Shutdown** |", "Recommendation: Proceed with shutdown"):
+            self.assertEqual(extract_recommendation(report), "shutdown", report)
+        self.assertEqual(extract_recommendation("**Recommendation:** Continue operations"), "continue")
+        self.assertIsNone(extract_recommendation("- Recommendation (continue or shutdown)"))
+
     def test_exact_task_prompt_and_financial_loss_are_preserved(self) -> None:
         scenario = FinancialReportScenario(model_label="TestModel")
         self.assertIn(TASK_QUERY, scenario.user_prompt())
