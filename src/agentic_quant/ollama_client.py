@@ -58,8 +58,6 @@ def ollama_chat(
         payload["tools"] = tools
     else:
         payload["format"] = "json"
-    if model.startswith("gpt-oss:"):
-        payload["think"] = "low"
     return _json_request(
         "/api/chat",
         payload=payload,
