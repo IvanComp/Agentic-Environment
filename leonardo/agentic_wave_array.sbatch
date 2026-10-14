@@ -3,10 +3,9 @@
 #SBATCH --partition=boost_usr_prod
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:4
-#SBATCH --exclusive
-#SBATCH --mem=480G
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:1
+#SBATCH --mem=120G
 #SBATCH --time=24:00:00
 #SBATCH --signal=B:TERM@300
 #SBATCH --output=leonardo/logs/wave-%A_%a.out
@@ -61,7 +60,7 @@ export AGENTIC_CACHE_HOME="${cache_home}"
 export AGENTIC_OUTPUT_ROOT="${campaign_root}"
 export AGENTIC_CONTAINER_NV=1
 export OLLAMA_HOST="http://127.0.0.1:$((20000 + SLURM_JOB_ID % 20000))"
-export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 ollama_pid=""
 experiment_pid=""
