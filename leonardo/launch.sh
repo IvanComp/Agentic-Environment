@@ -51,7 +51,7 @@ main() {
 
     echo "Waiting for the jobs to finish. You can close this window and later run ./leonardo/results.sh"
     while squeue -h -j "${cleanup_job}" 2>/dev/null | grep -q .; do
-        echo "$(date +%H:%M) $(squeue -h -u "${user}" -o '%j=%T' | sort | uniq -c | tr -s ' ' | tr '\n' ' ')"
+        echo "$(date +%H:%M) $(squeue -h -u "${user}" -o '%j=%T' | sort | uniq -c | tr -s ' ' | tr '\n' ' ') $(cat leonardo/logs/model-*.out 2>/dev/null | grep model-download | tail -n 1 | sed 's/.*percent=/download /')"
         sleep 60
     done
     "${repo_dir}/leonardo/results.sh"
