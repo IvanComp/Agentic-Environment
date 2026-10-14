@@ -90,7 +90,7 @@ class ReferenceProtocolTest(unittest.TestCase):
         record = _build_record(
             scenario=scenario,
             condition="good_peer",
-            architecture="unprotected",
+            architecture="baseline",
             seed=0,
             temperature=1.0,
             critic_run=run,

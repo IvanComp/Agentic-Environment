@@ -2,7 +2,7 @@
 set -euo pipefail
 
 campaign="${1:?usage: leonardo/show_runs.sh <campaign-name> [architecture]}"
-architecture="${2:-unprotected}"
+architecture="${2:-baseline}"
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 root="${AGENTIC_RESULTS_ROOT:-${WORK}/Agentic-Environment/campaigns}/${campaign}"
 cache_base="${FAST:-${WORK}}"

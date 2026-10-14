@@ -39,6 +39,7 @@ def ollama_chat(
     seed: int,
     tools: list[dict[str, Any]] | None = None,
     num_ctx: int | None = None,
+    json_mode: bool = True,
     timeout: float = 600,
 ) -> dict[str, Any]:
     options: dict[str, Any] = {
@@ -56,7 +57,7 @@ def ollama_chat(
     }
     if tools:
         payload["tools"] = tools
-    else:
+    elif json_mode:
         payload["format"] = "json"
     return _json_request(
         "/api/chat",

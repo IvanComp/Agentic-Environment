@@ -61,6 +61,18 @@ class OllamaClientTest(unittest.TestCase):
         self.assertNotIn("think", payload)
         self.assertEqual(payload["format"], "json")
 
+    def test_judge_call_sends_plain_text_without_json_format(self) -> None:
+        requests = []
+
+        def fake_urlopen(request, timeout):
+            requests.append(request)
+            return FakeResponse()
+
+        with patch("agentic_quant.ollama_client.urlopen", side_effect=fake_urlopen):
+            ollama_chat(model="gpt-oss:20b", messages=[], max_tokens=8, temperature=0.0, seed=0, json_mode=False)
+
+        self.assertNotIn("format", json.loads(requests[0].data))
+
     def test_unparsable_model_output_does_not_stop_the_run(self) -> None:
         error = RuntimeError("error parsing tool call: raw='import pandas as pd', err=invalid character 'i'")
         with patch("agentic_quant.providers.model_status", return_value={"downloaded": True}):

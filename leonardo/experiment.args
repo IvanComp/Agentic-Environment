@@ -12,7 +12,7 @@ good_peer
 neutral_peer
 bad_peer
 --patterns
-unprotected
+baseline
 atomic_verifiable_claims
 sandbox_gatekeeper
 context_epistemic_routing
