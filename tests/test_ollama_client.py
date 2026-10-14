@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from agentic_quant.model_store import model_status
 from agentic_quant.ollama_client import delete_ollama_model, ollama_chat, ollama_models
+from agentic_quant.providers import OllamaModelProvider
 
 
 class FakeResponse:
@@ -59,6 +60,18 @@ class OllamaClientTest(unittest.TestCase):
         payload = json.loads(requests[0][0].data)
         self.assertNotIn("think", payload)
         self.assertEqual(payload["format"], "json")
+
+    def test_unparsable_model_output_does_not_stop_the_run(self) -> None:
+        error = RuntimeError("error parsing tool call: raw='import pandas as pd', err=invalid character 'i'")
+        with patch("agentic_quant.providers.model_status", return_value={"downloaded": True}):
+            provider = OllamaModelProvider(model_key="gpt-oss:20b")
+        with patch("agentic_quant.providers.ollama_chat", side_effect=error):
+            response = provider.generate("verify")
+            chat = provider.chat([{"role": "user", "content": "task"}], tools=[{"type": "function"}])
+
+        self.assertEqual(response.text, "")
+        self.assertTrue(chat.malformed)
+        self.assertEqual(chat.tool_calls, [])
 
     def test_delete_uses_ollama_delete_endpoint(self) -> None:
         requests = []
