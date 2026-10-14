@@ -480,17 +480,22 @@ class OllamaModelProvider:
         ))
         started = time.perf_counter()
         with self._generation_lock:
-            result = ollama_chat(
-                model=self.ollama_model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                seed=self.seed,
-                num_ctx=self.n_ctx,
-            )
+            try:
+                result = ollama_chat(
+                    model=self.ollama_model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    seed=self.seed,
+                    num_ctx=self.n_ctx,
+                )
+            except RuntimeError as exc:
+                if not _unparsable_output(exc):
+                    raise
+                result = {}
         message = result.get("message") or {}
         text = str(message.get("content") or "").strip()
         elapsed = time.perf_counter() - started
@@ -527,6 +532,18 @@ class OllamaModelProvider:
                         num_ctx=self.n_ctx,
                     )
             except RuntimeError as exc:
+                if _unparsable_output(exc):
+                    return ChatResponse(
+                        text="",
+                        tool_calls=[],
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        elapsed_s=time.perf_counter() - started,
+                        model=self.model_key,
+                        native_tools=True,
+                        malformed=True,
+                        raw={"error": str(exc)},
+                    )
                 if "does not support tools" not in str(exc):
                     raise
                 self.native_tools = False
@@ -574,6 +591,10 @@ class OllamaModelProvider:
             malformed=malformed,
             raw={"text": raw_text},
         )
+
+
+def _unparsable_output(exc: RuntimeError) -> bool:
+    return "error parsing tool call" in str(exc)
 
 
 def _tool_arguments(value: Any) -> dict[str, Any]:
