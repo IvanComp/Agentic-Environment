@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODELS=(glm-4.7 qwen3:235b gpt-oss:120b llama3.3:70b qwen3:32b mistral-small3.2:24b qwen3:8b)
+MODELS=(llama3.3:70b qwen3:32b mistral-small3.2:24b qwen3:14b qwen3:8b llama3.1:8b)
 WAVES=10
 PER_JOB=5
 
@@ -24,9 +24,10 @@ main() {
     for job_name in aq-model aq-wave aq-clean; do
         scancel -u "${user}" -n "${job_name}" 2>/dev/null || true
     done
-    rm -rf "${campaigns}"
+    local cache="${AGENTIC_CACHE_HOME:-${FAST:-${WORK}}/Agentic-Environment/model-cache}"
+    rm -rf "${campaigns}" "${cache}/models" "${cache}/ollama" "${cache}/locks"
     rm -f leonardo/logs/*.out leonardo/logs/*.err
-    echo "Cleaned old jobs, results and logs."
+    echo "Cleaned old jobs, results, logs and downloaded models."
     ./leonardo/prepare_cuda.sh
 
     unset AGENTIC_RESULTS_ROOT AGENTIC_SEED_START AGENTIC_SEED_STEP
@@ -39,7 +40,7 @@ main() {
         if [[ -n "${resources}" ]]; then
             export AGENTIC_WAVE_SBATCH_ARGS="--time=12:00:00 ${resources}"
         else
-            export AGENTIC_WAVE_SBATCH_ARGS="--time=04:00:00"
+            export AGENTIC_WAVE_SBATCH_ARGS="--time=08:00:00"
         fi
         submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" 2)"
         jobs="$(printf '%s\n' "${submitted}" | sed -n 's/^\(prepare\|wave\|cleanup\)_job=//p' | tr '\n' ' ')"

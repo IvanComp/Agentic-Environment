@@ -59,9 +59,6 @@ def main() -> None:
         path = download_model(args.model, progress=_progress)
         print(json.dumps({"model": args.model, "path": str(path), "status": model_status(args.model)}, indent=2))
         return
-    if args.command == "delete" and preset.keep_cached:
-        print(json.dumps({"model": args.model, "removed": [], "kept": True}, indent=2))
-        return
     if args.command == "delete":
         print(json.dumps({"model": args.model, "removed": delete_model(args.model)}, indent=2))
         return

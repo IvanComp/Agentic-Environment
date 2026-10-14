@@ -1,7 +1,7 @@
 model_gpus() {
     case "$1" in
         glm-4.7|qwen3:235b) echo 4 ;;
-        gpt-oss:120b|llama3.3:70b) echo 2 ;;
+        gpt-oss:120b) echo 2 ;;
         *) echo 1 ;;
     esac
 }

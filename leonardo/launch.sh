@@ -33,9 +33,10 @@ main() {
     for job_name in aq-model aq-wave aq-clean; do
         scancel -u "${user}" -n "${job_name}" 2>/dev/null || true
     done
-    rm -rf "${campaigns}"
+    local cache="${AGENTIC_CACHE_HOME:-${FAST:-${WORK}}/Agentic-Environment/model-cache}"
+    rm -rf "${campaigns}" "${cache}/models" "${cache}/ollama" "${cache}/locks"
     rm -f leonardo/logs/*.out leonardo/logs/*.err
-    echo "Cleaned old jobs, results and logs."
+    echo "Cleaned old jobs, results, logs and downloaded models."
     ./leonardo/prepare_cuda.sh
 
     unset AGENTIC_RESULTS_ROOT AGENTIC_SEED_START AGENTIC_SEED_STEP
