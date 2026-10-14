@@ -2,7 +2,13 @@
 set -euo pipefail
 
 main() {
-    local name="$1" waves="$2" per_job="$3" wave_options="$4" model="${5:-gpt-oss:20b}"
+    local name="$1" model="${2:-gpt-oss:20b}"
+    local waves per_job wave_options
+    case "${name}" in
+        test) waves=1 per_job=1 wave_options="--qos=boost_qos_dbg --time=00:30:00" ;;
+        campaign) waves=100 per_job=10 wave_options="--time=04:00:00" ;;
+        *) echo "Usage: launch.sh test|campaign [model]" >&2; exit 2 ;;
+    esac
     local repo_dir
     repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     local account="${AGENTIC_ACCOUNT:-$(basename "${WORK:?WORK is not defined}")}"
@@ -10,8 +16,11 @@ main() {
     local user="${USER:-$(id -un)}"
 
     cd "${repo_dir}"
-    git fetch -q origin
-    git reset -q --hard origin/main
+    if [[ "${AGENTIC_LAUNCH_UPDATED:-0}" != "1" ]]; then
+        git fetch -q origin
+        git reset -q --hard origin/main
+        AGENTIC_LAUNCH_UPDATED=1 exec "${repo_dir}/leonardo/launch.sh" "$@"
+    fi
     echo "Code: $(git log -1 --format='%h %s')"
 
     for job_name in aq-model aq-wave aq-clean; do
