@@ -24,3 +24,10 @@ def test_empty_data_gives_placeholders(tmp_path):
     (tmp_path / "data").mkdir()
     pr.build(tmp_path / "data", tmp_path / "out")
     assert "--" in (tmp_path / "out" / "tables" / "task_success.tex").read_text()
+
+
+def test_tables_only_without_figures(tmp_path):
+    (tmp_path / "data").mkdir()
+    pr.build(tmp_path / "data", tmp_path / "out", figures_enabled=False)
+    assert (tmp_path / "out" / "tables" / "overhead.tex").is_file()
+    assert not (tmp_path / "out" / "figures").exists()

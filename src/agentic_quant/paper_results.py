@@ -324,16 +324,17 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
     return fig
 
 
-def build(data: Path, out: Path) -> list[dict[str, Any]]:
+def build(data: Path, out: Path, figures_enabled: bool = True) -> list[dict[str, Any]]:
     records = load(data)
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
-    figures.mkdir(parents=True, exist_ok=True)
     (tables / "pp_matrix.tex").write_text(pp_matrix_latex(records), encoding="utf-8")
     (tables / "task_success.tex").write_text(task_success_latex(records), encoding="utf-8")
     (tables / "overhead.tex").write_text(overhead_latex(records), encoding="utf-8")
-    plot_tradeoff(records, figures / "tradeoff.pdf")
-    plot_flows(records, figures / "flows.pdf")
+    if figures_enabled:
+        figures.mkdir(parents=True, exist_ok=True)
+        plot_tradeoff(records, figures / "tradeoff.pdf")
+        plot_flows(records, figures / "flows.pdf")
     return records
 
 
@@ -342,11 +343,16 @@ def main() -> None:
     parser.add_argument("data", type=Path, nargs="?", default=Path("results/data"))
     parser.add_argument("--out", type=Path, default=Path("results"))
     args = parser.parse_args()
-    import matplotlib
-
-    matplotlib.use("Agg")
-    records = build(args.data, args.out)
+    try:
+        import matplotlib
+    except ImportError:
+        matplotlib = None
+    if matplotlib is not None:
+        matplotlib.use("Agg")
+    records = build(args.data, args.out, matplotlib is not None)
     print(f"{len(records)} records from {len(models_in(records))} models -> {args.out}")
+    if matplotlib is None:
+        print("matplotlib not installed: tables written, figures skipped")
 
 
 if __name__ == "__main__":
