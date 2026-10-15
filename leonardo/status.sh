@@ -2,12 +2,12 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-name="${1:-tasks234}"
+name="${1:-tasks234b}"
 root="${WORK:?WORK is not defined}/Agentic-Environment/campaigns/${name}"
-waves="${2:-10}"
+waves="${2:-100}"
 lines_per_run=6
 runs_per_wave=44
-if [[ "${name}" != "tasks234" ]]; then
+if [[ "${name}" != tasks234* ]]; then
     runs_per_wave=4
 fi
 now="$(date +%s)"

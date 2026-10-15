@@ -18,7 +18,7 @@ def archive(campaigns: Path, dest: Path, force: bool = False) -> list[Path]:
         wave = marker.parent
         model = wave.parent
         campaign = model.parent
-        if campaign.name == "paper":
+        if campaign.name in ("paper", "tasks234"):
             continue
         source = wave / "results.jsonl"
         if not source.is_file() or not source.stat().st_size:
