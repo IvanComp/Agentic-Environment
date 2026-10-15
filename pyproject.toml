@@ -22,6 +22,7 @@ agentic-quant-repeat = "agentic_quant.run_repeated:main"
 agentic-quant-ui = "agentic_quant.web_ui:main"
 agentic-quant-metrics = "agentic_quant.metrics:main"
 agentic-quant-install-cuda = "agentic_quant.install_cuda:main"
+agentic-quant-paper = "agentic_quant.paper_results:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
