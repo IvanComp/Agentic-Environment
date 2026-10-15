@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -43,17 +44,22 @@ def model_of(file: Path) -> str:
     return folder.parent.name if folder.name.startswith("wave_") else folder.name
 
 
+def _open(file: Path):
+    return gzip.open(file, "rt", encoding="utf-8") if file.suffix == ".gz" else file.open(encoding="utf-8")
+
+
 def load(root: Path) -> list[dict[str, Any]]:
     records = []
-    for file in sorted(Path(root).rglob("results.jsonl")):
+    files = sorted([*Path(root).rglob("results.jsonl"), *Path(root).rglob("wave_*.jsonl.gz")])
+    for file in files:
         model = model_of(file)
-        with file.open(encoding="utf-8") as handle:
+        with _open(file) as handle:
             for line in handle:
                 if line.strip():
                     record = json.loads(line)
                     if record.get("scenario") in TASK_OF_SCENARIO:
                         record["_model"] = model
-                        record["_source"] = str(file.parent)
+                        record["_source"] = str(file.parent if file.suffix != ".gz" else file.with_suffix(""))
                         records.append(record)
     return records
 

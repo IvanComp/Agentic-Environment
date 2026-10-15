@@ -14,5 +14,3 @@ Agentic_papers/
 runs/
 output/
 campaigns/
-results/data/*
-!results/data/.gitkeep
