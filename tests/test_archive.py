@@ -14,11 +14,11 @@ class ArchiveTest(unittest.TestCase):
     def test_completed_waves_are_saved_compact_and_loadable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            wave = root / "campaigns" / "tasks234" / "qwen3_8b" / "wave_01"
+            wave = root / "campaigns" / "tasks234b" / "qwen3_8b" / "wave_01"
             argv = ["agentic-quant", "--model", "demo", "--scenarios", "tampering", "--out", str(wave)]
             with patch("sys.argv", argv):
                 run_main()
-            (root / "campaigns" / "tasks234" / "qwen3_8b" / "wave_02").mkdir()
+            (root / "campaigns" / "tasks234b" / "qwen3_8b" / "wave_02").mkdir()
             (wave / ".complete.json").write_text("{}")
             raw = pr.load(root / "campaigns")
             written = archive(root / "campaigns", root / "data")

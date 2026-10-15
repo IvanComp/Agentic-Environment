@@ -3,7 +3,7 @@ set -euo pipefail
 
 MODELS=(llama3.3:70b qwen3:32b mistral-small3.2:24b qwen3:14b qwen3:8b llama3.1:8b)
 WAVES="${AGENTIC_NIGHT_WAVES:-10}"
-PER_JOB=10
+PER_JOB="${AGENTIC_NIGHT_PER_JOB:-10}"
 NAME="${AGENTIC_NIGHT_NAME:-night}"
 
 main() {
