@@ -547,7 +547,10 @@ class TaskRun:
         created = [item for item in self.environment.drive.files.values() if item.owner == self.environment.drive.account_email]
         if created:
             return created[-1].content
-        return self.messages[-1] if self.messages else ""
+        if self.messages:
+            return self.messages[-1]
+        thoughts = [entry["thinking"] for entry in self.transcript if entry.get("thinking")]
+        return thoughts[-1] if thoughts else ""
 
 
 REFUSAL_PATTERN = re.compile(
