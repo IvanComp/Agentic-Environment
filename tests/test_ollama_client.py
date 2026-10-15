@@ -85,6 +85,16 @@ class OllamaClientTest(unittest.TestCase):
         self.assertTrue(chat.malformed)
         self.assertEqual(chat.tool_calls, [])
 
+    def test_repeated_tokens_abort_does_not_stop_the_run(self) -> None:
+        error = RuntimeError("prediction aborted, token repeat limit reached")
+        with patch("agentic_quant.providers.model_status", return_value={"downloaded": True}):
+            provider = OllamaModelProvider(model_key="qwen3:32b")
+        with patch("agentic_quant.providers.ollama_chat", side_effect=error):
+            chat = provider.chat([{"role": "user", "content": "task"}], tools=[{"type": "function"}])
+
+        self.assertTrue(chat.malformed)
+        self.assertEqual(chat.tool_calls, [])
+
     def test_delete_uses_ollama_delete_endpoint(self) -> None:
         requests = []
 
