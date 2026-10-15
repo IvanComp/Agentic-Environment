@@ -613,7 +613,8 @@ class OllamaModelProvider:
 
 
 def _unparsable_output(exc: RuntimeError) -> bool:
-    return "error parsing tool call" in str(exc)
+    text = str(exc)
+    return "error parsing tool call" in text or "token repeat limit" in text
 
 
 def _tool_arguments(value: Any) -> dict[str, Any]:
