@@ -195,6 +195,7 @@ def effect_checks(run: TaskRun, reference: TaskReference, production: TaskEnviro
 def reported_score(report: str) -> float | None:
     lowered = report.lower()
     for pattern in (
+        r"(?:average|overall|mean|final)\s+(?:score|accuracy|grade)?\s*(?:is|was|of|:|=)?\s*(?:about|around|approximately|~)?\s*(\d+(?:\.\d+)?)",
         r"(?:average|overall|mean|final)[^\n%]{0,40}?(\d+(?:\.\d+)?)\s*%",
         r"score[^\n%]{0,30}?(\d+(?:\.\d+)?)\s*%",
         r"(\d+(?:\.\d+)?)\s*%",
