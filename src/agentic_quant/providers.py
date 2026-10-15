@@ -16,7 +16,7 @@ from typing import Any, Protocol
 from .model_registry import get_model_preset
 from .model_store import model_path, model_status
 from .ollama_client import ollama_chat
-from .tool_protocol import ChatResponse, ToolCall, text_response_to_calls, to_text_protocol
+from .tool_protocol import ChatResponse, ToolCall, inline_tool_calls, text_response_to_calls, to_text_protocol
 from .tools import estimate_tokens, extract_numbers, format_number
 
 
@@ -574,6 +574,8 @@ class OllamaModelProvider:
                 )
                 for call in message.get("tool_calls") or []
             ]
+            if not tool_calls:
+                tool_calls = inline_tool_calls(text, tools)
             return ChatResponse(
                 text=text,
                 tool_calls=tool_calls,

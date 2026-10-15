@@ -16,6 +16,9 @@ main() {
     fi
     echo "Code: $(git log -1 --format='%h %s')"
     source leonardo/models.sh
+    if (( $# > 0 )); then
+        MODELS=("$@")
+    fi
     local account="${AGENTIC_ACCOUNT:-$(basename "${WORK:?WORK is not defined}")}"
     local campaigns="${WORK}/Agentic-Environment/campaigns"
     local user="${USER:-$(id -un)}"

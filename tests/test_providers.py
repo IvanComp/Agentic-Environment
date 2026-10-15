@@ -131,6 +131,32 @@ class OllamaModelProviderTest(unittest.TestCase):
         self.assertEqual(call["max_tokens"], 80)
         self.assertEqual(call["temperature"], 0.2)
 
+    def test_tool_call_written_as_text_is_used(self) -> None:
+        text = 'I will list the sheets. {"type": "function", "name": "list_sheets", "parameters": {}}'
+        response = {"message": {"role": "assistant", "content": text}, "prompt_eval_count": 5, "eval_count": 5}
+        tools = [{"type": "function", "function": {"name": "list_sheets", "parameters": {}}}]
+        with (
+            patch("agentic_quant.providers.model_status", return_value={"downloaded": True}),
+            patch("agentic_quant.providers.ollama_chat", return_value=response),
+        ):
+            provider = OllamaModelProvider(model_key="llama3.3:70b", seed=1)
+            result = provider.chat([{"role": "user", "content": "go"}], tools=tools)
+
+        self.assertEqual([(call.name, call.arguments) for call in result.tool_calls], [("list_sheets", {})])
+
+    def test_unknown_tool_written_as_text_is_ignored(self) -> None:
+        text = 'Next I use {"name": "get_sheet_data", "parameters": {}}'
+        response = {"message": {"role": "assistant", "content": text}, "prompt_eval_count": 5, "eval_count": 5}
+        tools = [{"type": "function", "function": {"name": "list_sheets", "parameters": {}}}]
+        with (
+            patch("agentic_quant.providers.model_status", return_value={"downloaded": True}),
+            patch("agentic_quant.providers.ollama_chat", return_value=response),
+        ):
+            provider = OllamaModelProvider(model_key="llama3.3:70b", seed=1)
+            result = provider.chat([{"role": "user", "content": "go"}], tools=tools)
+
+        self.assertEqual(result.tool_calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()
