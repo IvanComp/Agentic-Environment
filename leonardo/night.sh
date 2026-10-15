@@ -2,8 +2,9 @@
 set -euo pipefail
 
 MODELS=(llama3.3:70b qwen3:32b mistral-small3.2:24b qwen3:14b qwen3:8b llama3.1:8b)
-WAVES=10
+WAVES="${AGENTIC_NIGHT_WAVES:-10}"
 PER_JOB=10
+NAME="${AGENTIC_NIGHT_NAME:-night}"
 
 main() {
     local repo_dir
@@ -22,28 +23,33 @@ main() {
     local account="${AGENTIC_ACCOUNT:-$(basename "${WORK:?WORK is not defined}")}"
     local campaigns="${WORK}/Agentic-Environment/campaigns"
     local user="${USER:-$(id -un)}"
-    local root="${campaigns}/night"
+    local root="${campaigns}/${NAME}"
 
     for job_name in aq-model aq-wave aq-clean; do
         scancel -u "${user}" -n "${job_name}" 2>/dev/null || true
     done
     local cache="${AGENTIC_CACHE_HOME:-${FAST:-${WORK}}/Agentic-Environment/model-cache}"
-    rm -rf "${campaigns}" "${cache}/models" "${cache}/ollama" "${cache}/locks"
-    rm -f leonardo/logs/*.out leonardo/logs/*.err
-    echo "Cleaned old jobs, results, logs and downloaded models."
+    if [[ "${AGENTIC_KEEP_RESULTS:-0}" == "1" ]]; then
+        rm -rf "${cache}/models" "${cache}/ollama" "${cache}/locks"
+        echo "Cleaned old jobs and downloaded models. Results and logs are kept."
+    else
+        rm -rf "${campaigns}" "${cache}/models" "${cache}/ollama" "${cache}/locks"
+        rm -f leonardo/logs/*.out leonardo/logs/*.err
+        echo "Cleaned old jobs, results, logs and downloaded models."
+    fi
     ./leonardo/prepare_cuda.sh
 
     unset AGENTIC_RESULTS_ROOT AGENTIC_SEED_START AGENTIC_SEED_STEP
-    export AGENTIC_CAMPAIGN_NAME=night AGENTIC_WAVES="${WAVES}" AGENTIC_WAVES_PER_JOB="${PER_JOB}"
+    export AGENTIC_CAMPAIGN_NAME="${NAME}" AGENTIC_WAVES="${WAVES}" AGENTIC_WAVES_PER_JOB="${PER_JOB}"
     mkdir -p "${root}"
     local cleanup_jobs=() model slug resources submitted jobs
     for model in "${MODELS[@]}"; do
         slug="$(printf '%s' "${model}" | tr -c 'A-Za-z0-9._-' '_')"
         resources="$(model_resources "${model}")"
         if [[ -n "${resources}" ]]; then
-            export AGENTIC_WAVE_SBATCH_ARGS="--time=12:00:00 ${resources}"
+            export AGENTIC_WAVE_SBATCH_ARGS="--time=${AGENTIC_NIGHT_TIME:-12:00:00} ${resources}"
         else
-            export AGENTIC_WAVE_SBATCH_ARGS="--time=12:00:00"
+            export AGENTIC_WAVE_SBATCH_ARGS="--time=${AGENTIC_NIGHT_TIME:-12:00:00}"
         fi
         if ! submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" 1)"; then
             echo "${model}: not submitted (job limit reached)"
@@ -63,7 +69,7 @@ main() {
         echo "$(date +%H:%M) $(squeue -h -u "${user}" -o '%j=%T' | sort | uniq -c | tr -s ' ' | tr '\n' ' ')"
         sleep 300
     done
-    ./leonardo/report.sh night
+    ./leonardo/report.sh "${NAME}"
 }
 
 main "$@"

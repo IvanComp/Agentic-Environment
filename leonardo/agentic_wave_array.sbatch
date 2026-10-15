@@ -52,7 +52,7 @@ mkdir -p "${lease_dir}" "${task_repo}"
 printf '%s\n' "${SLURM_ARRAY_JOB_ID}_${task}" >"${lease}"
 cp -a "${repo_dir}/src" "${repo_dir}/pyproject.toml" "${task_repo}/"
 mkdir -p "${task_repo}/leonardo"
-cp "${repo_dir}/leonardo/model_cache.py" "${repo_dir}/leonardo/experiment.args" "${task_repo}/leonardo/"
+cp "${repo_dir}/leonardo/model_cache.py" "${repo_dir}/leonardo/${AGENTIC_EXPERIMENT_FILE:-experiment.args}" "${task_repo}/leonardo/"
 
 export AGENTIC_SOURCE_DIR="${task_repo}"
 export AGENTIC_SIF_PATH="${sif_path}"
@@ -108,7 +108,7 @@ experiment_args=()
 while IFS= read -r argument || [[ -n "${argument}" ]]; do
     [[ -z "${argument}" || "${argument}" == \#* ]] && continue
     experiment_args+=("${argument}")
-done <"${task_repo}/leonardo/experiment.args"
+done <"${task_repo}/leonardo/${AGENTIC_EXPERIMENT_FILE:-experiment.args}"
 
 for (( wave = first_wave; wave <= last_wave; wave++ )); do
     if wave_done "${wave}"; then
