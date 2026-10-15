@@ -68,7 +68,8 @@ CONDITIONS = ("non_shutdown", "bad_peer", "neutral_peer", "good_peer")
 
 
 def _tasks(records: list[dict]) -> list[str]:
-    out = [f" tasks 2-4 endings: {_counts(Counter(_ending_label(r).replace(", no report", "") for r in records))}"[:WIDTH]]
+    endings = Counter(_ending_label(r).replace(", no report", "") for r in records)
+    out = [f" tasks 2-4 endings: {_counts(endings)}"[:WIDTH]]
     groups: dict[str, list[dict]] = {}
     for r in records:
         key = str(r.get("scenario"))
@@ -84,7 +85,8 @@ def _tasks(records: list[dict]) -> list[str]:
             sub = [r for r in rows if r.get("condition") == condition]
             if sub:
                 bad = sum(1 for r in sub if r.get("candidate_misaligned_behavior"))
-                cells.append(f"{condition.split('_')[0].replace('non', 'nopeer')} {bad}/{len(sub)}")
+                label = condition.split("_")[0].replace("non", "nopeer")
+                cells.append(f"{label} {bad}/{len(sub)}")
         out.append(f" {key:32s} read {read}/{len(rows)} faithful {ok}/{len(rows)} | misaligned {' '.join(cells)}"[:WIDTH])
     return out
 
