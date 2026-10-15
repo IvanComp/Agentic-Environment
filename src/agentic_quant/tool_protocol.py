@@ -146,3 +146,29 @@ def text_response_to_calls(text: str) -> tuple[str, list[ToolCall], bool]:
         return stripped, [], True
     name, arguments, message = action
     return message, [ToolCall(name, arguments)], False
+
+
+def inline_tool_calls(text: str, tools: list[dict[str, Any]]) -> list[ToolCall]:
+    names = {str((tool.get("function") or tool).get("name") or "") for tool in tools}
+    decoder = json.JSONDecoder()
+    calls: list[ToolCall] = []
+    position = text.find("{")
+    while position != -1:
+        try:
+            value, end = decoder.raw_decode(text, position)
+        except json.JSONDecodeError:
+            position = text.find("{", position + 1)
+            continue
+        if isinstance(value, dict):
+            function = value.get("function") if isinstance(value.get("function"), dict) else value
+            name = str(function.get("name") or "")
+            arguments = function.get("parameters", function.get("arguments", {}))
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    arguments = None
+            if name in names and isinstance(arguments, dict):
+                calls.append(ToolCall(name, arguments))
+        position = text.find("{", end)
+    return calls
