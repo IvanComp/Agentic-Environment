@@ -15,12 +15,17 @@ class QuotaExhausted(RuntimeError):
     pass
 
 
-def api_base_url() -> str:
-    return os.environ.get("AGENTIC_API_BASE", "https://openrouter.ai/api/v1").strip().rstrip("/")
+def api_base_url(template: str = "") -> str:
+    base = template or os.environ.get("AGENTIC_API_BASE", "https://openrouter.ai/api/v1")
+    try:
+        return base.strip().format(**os.environ).rstrip("/")
+    except KeyError as exc:
+        raise RuntimeError(f"Set {exc.args[0]} in .api_keys for {base}") from exc
 
 
-def api_key() -> str:
-    return (os.environ.get("AGENTIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or "").strip()
+def api_key(env: str = "") -> str:
+    names = [env] if env else ["AGENTIC_API_KEY", "OPENROUTER_API_KEY"]
+    return next((os.environ[name].strip() for name in names if os.environ.get(name, "").strip()), "")
 
 
 def to_openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -68,6 +73,8 @@ def api_chat(
     tools: list[dict[str, Any]] | None = None,
     timeout: float = 900,
     attempts: int = 8,
+    base_url: str = "",
+    key: str = "",
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": model,
@@ -83,7 +90,7 @@ def api_chat(
     delay = 5.0
     for attempt in range(attempts):
         try:
-            result = _post("/chat/completions", payload, timeout=timeout)
+            result = _post(base_url or api_base_url(), key or api_key(), "/chat/completions", payload, timeout=timeout)
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
             if exc.code == 400 and "temperature" in body and "temperature" in payload:
@@ -104,7 +111,7 @@ def api_chat(
                 time.sleep(delay)
                 delay = min(delay * 2, 300)
                 continue
-            raise RuntimeError(f"{model}: {api_base_url()} unreachable: {exc}") from exc
+            raise RuntimeError(f"{model}: {base_url or api_base_url()} unreachable: {exc}") from exc
         if result.get("error"):
             error = result["error"]
             code = error.get("code") if isinstance(error, dict) else None
@@ -147,14 +154,13 @@ def _retry_after(exc: HTTPError) -> float:
         return 0
 
 
-def _post(path: str, payload: dict[str, Any], *, timeout: float) -> dict[str, Any]:
+def _post(base_url: str, key: str, path: str, payload: dict[str, Any], *, timeout: float) -> dict[str, Any]:
     headers = {"Content-Type": "application/json", "User-Agent": "agentic-quant/0.2"}
-    key = api_key()
     if key:
         headers["Authorization"] = f"Bearer {key}"
-    request = Request(f"{api_base_url()}{path}", data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+    request = Request(f"{base_url}{path}", data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
     with urlopen(request, timeout=timeout) as response:
         result = json.loads(response.read())
     if not isinstance(result, dict):
-        raise RuntimeError(f"Invalid response from {api_base_url()}{path}")
+        raise RuntimeError(f"Invalid response from {base_url}{path}")
     return result

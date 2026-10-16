@@ -53,7 +53,7 @@ def model_status(model_key: str) -> dict[str, Any]:
     if preset.backend == "api":
         from .api_client import api_key
 
-        ready = bool(api_key())
+        ready = bool(api_key(preset.api_key_env))
         return {
             **preset.to_dict(),
             "downloaded": ready,
@@ -64,7 +64,7 @@ def model_status(model_key: str) -> dict[str, Any]:
             "bytes_downloaded": 0,
             "bytes_total": 0,
             "percent": 100 if ready else 0,
-            "error": "" if ready else "Set AGENTIC_API_KEY or OPENROUTER_API_KEY.",
+            "error": "" if ready else f"Set {preset.api_key_env or 'AGENTIC_API_KEY'}.",
         }
 
     paths = model_file_paths(model_key)
@@ -119,7 +119,8 @@ def ensure_models(model_keys: list[str], *, download: bool, progress: Callable[[
     missing = missing_model_keys(model_keys)
     keyless = [key for key in missing if get_model_preset(key).backend == "api"]
     if keyless:
-        raise RuntimeError("API models need a key in AGENTIC_API_KEY or OPENROUTER_API_KEY: " + ", ".join(keyless))
+        names = ", ".join(f"{key} ({get_model_preset(key).api_key_env or 'AGENTIC_API_KEY'})" for key in keyless)
+        raise RuntimeError(f"API keys missing in .api_keys: {names}")
     if missing and not download:
         labels = ", ".join(get_model_preset(key).label for key in missing)
         if any(getattr(get_model_preset(key), "backend", "gguf") == "ollama" for key in missing):

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from .api_client import api_chat, api_key, response_message, response_thinking
+from .api_client import api_base_url, api_chat, api_key, response_message, response_thinking
 from .model_registry import get_model_preset
 from .model_store import model_path, model_status
 from .ollama_client import ollama_chat
@@ -622,12 +622,25 @@ class ApiModelProvider:
         self.api_model = self.preset.ollama_model or model_key
         self.seed = seed
         self.native_tools = True
-        if not api_key():
-            raise RuntimeError(f"{self.preset.label} needs an API key in AGENTIC_API_KEY or OPENROUTER_API_KEY.")
+        self.key = api_key(self.preset.api_key_env)
+        if not self.key:
+            raise RuntimeError(f"{self.preset.label} needs an API key in {self.preset.api_key_env or 'AGENTIC_API_KEY or OPENROUTER_API_KEY'}.")
+        self.base_url = api_base_url(self.preset.api_base)
         self.compute_unit = {"kind": "cloud", "backend": "OpenAI-compatible API", "label": self.api_model, "verified": True}
 
     def _call(self, messages: list[dict[str, Any]], *, max_tokens: int, temperature: float | None, tools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-        return api_chat(model=self.api_model, messages=messages, tools=tools, max_tokens=max_tokens, temperature=temperature, seed=self.seed)
+        if self.preset.max_output_tokens:
+            max_tokens = min(max_tokens, self.preset.max_output_tokens)
+        return api_chat(
+            model=self.api_model,
+            messages=messages,
+            tools=tools,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=self.seed,
+            base_url=self.base_url,
+            key=self.key,
+        )
 
     def generate(
         self,

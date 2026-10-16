@@ -102,15 +102,19 @@ It reads every `results.jsonl` below the given folders and writes `metrics.json`
 
 ## Frontier models
 
-The eight models of Potter et al. run through an OpenAI-compatible API (OpenRouter by default): `gpt-5.2`, `gemini-3-flash`, `gemini-3-pro`, `claude-haiku-4.5`, `claude-opus-4.5`, `glm-4.7-api`, `kimi-k2.5`, `deepseek-v3.1`.
+The models of Potter et al. run through OpenAI-compatible APIs. Free tiers: `deepseek-v3.1-free` (OpenRouter), `glm-4.7-free` (Cerebras, output capped at 2,048 tokens), `kimi-k2.5-free` (Cloudflare Workers AI), `gemini-3-flash-free` (Google AI Studio). Paid through OpenRouter: `gpt-5.2`, `gemini-3-flash`, `gemini-3-pro`, `claude-haiku-4.5`, `claude-opus-4.5`, `glm-4.7-api`, `kimi-k2.5`, `deepseek-v3.1`.
 
-Put the API key in a file named `.api_key` in the repo root, then run:
+Put the keys in a file named `.api_keys` in the repo root:
 
 ```bash
-./frontier.sh deepseek-v3.1 --tasks 1 --waves 100
+OPENROUTER_API_KEY=...
+CEREBRAS_API_KEY=...
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_API_TOKEN=...
+GEMINI_API_KEY=...
 ```
 
-Completed waves are skipped, so rerunning continues where the last run stopped (for example after a daily quota). The script archives the waves in `results/data/frontier/`, rebuilds the tables and pushes them. `AGENTIC_API_BASE` points to another endpoint; a request answered by a different model than the one asked for is rejected.
+Then run `./frontier.sh` (Task 1, 100 waves, the four free models) or `./frontier.sh deepseek-v3.1 --tasks 1 2 3 4`. Each critic run is saved as soon as it ends, so a run stopped by a daily quota continues from there on the next launch. The script archives finished waves in `results/data/frontier/`, rebuilds the tables and pushes them. A request answered by a different model than the one asked for is rejected.
 
 ## LEONARDO
 

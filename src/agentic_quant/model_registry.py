@@ -21,6 +21,9 @@ class ModelPreset:
     agent_name: str = ""
     hf_folder: str = ""
     modelfile: str = ""
+    api_base: str = ""
+    api_key_env: str = ""
+    max_output_tokens: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -527,6 +530,74 @@ MODEL_PRESETS = [
         notes="Frontier model evaluated by Potter et al., served through an OpenAI-compatible API.",
         backend="api",
         ollama_model="deepseek/deepseek-chat-v3.1",
+    ),
+    ModelPreset(
+        key="deepseek-v3.1-free",
+        label="DeepSeek V3.1 (OpenRouter free)",
+        family="DeepSeek",
+        agent_name="DeepSeek",
+        parameters="API",
+        repo_id=None,
+        filename=None,
+        approximate_size="API",
+        expected_bytes=0,
+        notes="Frontier model evaluated by Potter et al., served by a free API tier.",
+        backend="api",
+        ollama_model="deepseek/deepseek-chat-v3.1:free",
+        api_base="",
+        api_key_env="OPENROUTER_API_KEY",
+        max_output_tokens=0,
+    ),
+    ModelPreset(
+        key="glm-4.7-free",
+        label="GLM 4.7 (Cerebras free)",
+        family="GLM",
+        agent_name="GLM",
+        parameters="API",
+        repo_id=None,
+        filename=None,
+        approximate_size="API",
+        expected_bytes=0,
+        notes="Frontier model evaluated by Potter et al., served by a free API tier.",
+        backend="api",
+        ollama_model="zai-glm-4.7",
+        api_base="https://api.cerebras.ai/v1",
+        api_key_env="CEREBRAS_API_KEY",
+        max_output_tokens=2048,
+    ),
+    ModelPreset(
+        key="kimi-k2.5-free",
+        label="Kimi K2.5 (Cloudflare free)",
+        family="Moonshot Kimi",
+        agent_name="Kimi",
+        parameters="API",
+        repo_id=None,
+        filename=None,
+        approximate_size="API",
+        expected_bytes=0,
+        notes="Frontier model evaluated by Potter et al., served by a free API tier.",
+        backend="api",
+        ollama_model="@cf/moonshotai/kimi-k2.5",
+        api_base="https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+        api_key_env="CLOUDFLARE_API_TOKEN",
+        max_output_tokens=0,
+    ),
+    ModelPreset(
+        key="gemini-3-flash-free",
+        label="Gemini 3 Flash (Google AI Studio free)",
+        family="Google Gemini",
+        agent_name="Gemini",
+        parameters="API",
+        repo_id=None,
+        filename=None,
+        approximate_size="API",
+        expected_bytes=0,
+        notes="Frontier model evaluated by Potter et al., served by a free API tier.",
+        backend="api",
+        ollama_model="gemini-3-flash-preview",
+        api_base="https://generativelanguage.googleapis.com/v1beta/openai",
+        api_key_env="GEMINI_API_KEY",
+        max_output_tokens=0,
     ),
 ]
 

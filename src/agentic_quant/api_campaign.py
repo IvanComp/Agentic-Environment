@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,33 +42,49 @@ def run_campaign(model: str, *, campaign: str, root: Path, waves: int, tasks: li
     completed = 0
     for wave in range(1, waves + 1):
         wave_dir = model_root / f"wave_{wave:02d}"
-        marker = wave_dir / ".complete.json"
-        if marker.exists():
+        if (wave_dir / ".complete.json").exists():
             completed += 1
             continue
         seed = seed_start + wave - 1
         print(f"{model}: wave {wave}/{waves} seed {seed}", flush=True)
-        try:
-            run_experiment(
-                model_key=model,
-                n_ctx=32768,
-                seed=seed,
-                temperature=1.0,
-                max_tokens=8192,
-                max_steps=30,
-                scenarios=scenarios,
-                conditions=CONDITIONS,
-                architectures=PATTERNS,
-                out=wave_dir,
-                echo=False,
-                retain_records=False,
-            )
-        except QuotaExhausted as exc:
-            print(f"{model}: quota reached at wave {wave}, {completed} waves complete. Run again later to continue.")
-            print(str(exc)[:300])
-            return completed
-        wave_dir.mkdir(parents=True, exist_ok=True)
-        marker.write_text(
+        parts = wave_dir / "parts"
+        for scenario in scenarios:
+            for condition in CONDITIONS:
+                part = parts / f"{scenario}.{condition}.jsonl"
+                if part.exists():
+                    continue
+                scratch = model_root / ".running"
+                shutil.rmtree(scratch, ignore_errors=True)
+                try:
+                    run_experiment(
+                        model_key=model,
+                        n_ctx=32768,
+                        seed=seed,
+                        temperature=1.0,
+                        max_tokens=8192,
+                        max_steps=30,
+                        scenarios=[scenario],
+                        conditions=[condition],
+                        architectures=PATTERNS,
+                        out=scratch,
+                        echo=False,
+                        retain_records=False,
+                    )
+                except QuotaExhausted as exc:
+                    shutil.rmtree(scratch, ignore_errors=True)
+                    print(f"{model}: quota reached in wave {wave}, {completed} waves complete. Run again later to continue.")
+                    print(str(exc)[:300])
+                    return completed
+                parts.mkdir(parents=True, exist_ok=True)
+                (scratch / "results.jsonl").replace(part)
+                (scratch / "config.json").replace(wave_dir / "config.json")
+                shutil.rmtree(scratch, ignore_errors=True)
+        with (wave_dir / "results.jsonl").open("w", encoding="utf-8") as handle:
+            for scenario in scenarios:
+                for condition in CONDITIONS:
+                    handle.write((parts / f"{scenario}.{condition}.jsonl").read_text(encoding="utf-8"))
+        shutil.rmtree(parts)
+        (wave_dir / ".complete.json").write_text(
             json.dumps(
                 {
                     "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -92,7 +109,7 @@ def main() -> None:
     parser.add_argument("--campaign", default="frontier")
     parser.add_argument("--root", type=Path, default=Path("campaigns"))
     parser.add_argument("--waves", type=int, default=100)
-    parser.add_argument("--tasks", nargs="+", default=sorted(TASKS), choices=sorted(TASKS))
+    parser.add_argument("--tasks", nargs="+", default=["1"], choices=sorted(TASKS))
     args = parser.parse_args()
     unknown = [model for model in args.models if model not in api_models()]
     if unknown:

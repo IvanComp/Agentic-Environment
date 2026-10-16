@@ -102,23 +102,57 @@ class ApiClientTest(unittest.TestCase):
             api_chat(model="openai/gpt-5.2", messages=[{"role": "user", "content": "x"}], max_tokens=8, temperature=0.0)
         self.assertNotIn("temperature", payloads[1])
 
-    def test_campaign_stops_on_quota_and_resumes(self) -> None:
+    def test_campaign_stops_on_quota_and_resumes_per_condition(self) -> None:
         calls = []
 
         def fake_run(**kwargs):
-            calls.append(kwargs["seed"])
-            if len(calls) == 2:
+            calls.append((kwargs["seed"], kwargs["conditions"][0]))
+            if len(calls) == 6:
                 raise QuotaExhausted("limit")
+            out = Path(kwargs["out"])
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "results.jsonl").write_text(json.dumps({"condition": kwargs["conditions"][0], "seed": kwargs["seed"]}) + "\n")
+            (out / "config.json").write_text("{}")
 
         with tempfile.TemporaryDirectory() as tmp, patch.object(api_campaign, "run_experiment", side_effect=fake_run):
             root = Path(tmp)
-            done = api_campaign.run_campaign("deepseek-v3.1", campaign="frontier", root=root, waves=3, tasks=["1"])
-            self.assertEqual(done, 1)
-            done = api_campaign.run_campaign("deepseek-v3.1", campaign="frontier", root=root, waves=3, tasks=["1"])
-            self.assertEqual(done, 3)
-            self.assertTrue((root / "frontier" / "deepseek-v3.1" / "wave_03" / ".complete.json").exists())
-        self.assertEqual(calls, [0, 1, 1, 2])
+            self.assertEqual(api_campaign.run_campaign("deepseek-v3.1", campaign="frontier", root=root, waves=2, tasks=["1"]), 1)
+            self.assertEqual(api_campaign.run_campaign("deepseek-v3.1", campaign="frontier", root=root, waves=2, tasks=["1"]), 2)
+            wave = root / "frontier" / "deepseek-v3.1" / "wave_02"
+            lines = [json.loads(line) for line in (wave / "results.jsonl").read_text().splitlines()]
+            self.assertEqual([line["condition"] for line in lines], api_campaign.CONDITIONS)
+            self.assertTrue((wave / ".complete.json").exists())
+            self.assertFalse((wave / "parts").exists())
+            self.assertEqual(list(root.rglob(".running")), [])
+        self.assertEqual(len(calls), 9)
+        self.assertEqual(calls[5], calls[6])
 
+    def test_free_preset_uses_its_own_endpoint_and_key(self) -> None:
+        requests = []
+
+        def fake_urlopen(request, timeout):
+            requests.append(request)
+            return FakeResponse(completion({"content": "ok"}, model="@cf/moonshotai/kimi-k2.5"))
+
+        with patch.dict(os.environ, {"CLOUDFLARE_API_TOKEN": "cf", "CLOUDFLARE_ACCOUNT_ID": "acc"}):
+            provider = make_model_provider(model_key="kimi-k2.5-free")
+            with patch("agentic_quant.api_client.urlopen", side_effect=fake_urlopen):
+                provider.judge("x", max_tokens=8)
+        self.assertEqual(requests[0].full_url, "https://api.cloudflare.com/client/v4/accounts/acc/ai/v1/chat/completions")
+        self.assertEqual(requests[0].get_header("Authorization"), "Bearer cf")
+
+    def test_glm_free_caps_output_tokens(self) -> None:
+        payloads = []
+
+        def fake_urlopen(request, timeout):
+            payloads.append(json.loads(request.data))
+            return FakeResponse(completion({"content": "ok"}, model="zai-glm-4.7"))
+
+        with patch.dict(os.environ, {"CEREBRAS_API_KEY": "c"}):
+            provider = make_model_provider(model_key="glm-4.7-free")
+            with patch("agentic_quant.api_client.urlopen", side_effect=fake_urlopen):
+                provider.judge("x", max_tokens=8192)
+        self.assertEqual(payloads[0]["max_tokens"], 2048)
 
 if __name__ == "__main__":
     unittest.main()

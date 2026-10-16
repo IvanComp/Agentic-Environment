@@ -5,9 +5,13 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${repo_dir}"
 python="${repo_dir}/.venv/bin/python"
 [[ -x "${python}" ]] || python=python3
-if [[ -z "${AGENTIC_API_KEY:-}" && -f "${repo_dir}/.api_key" ]]; then
-    AGENTIC_API_KEY="$(tr -d '[:space:]' <"${repo_dir}/.api_key")"
-    export AGENTIC_API_KEY
+if [[ -f "${repo_dir}/.api_keys" ]]; then
+    set -a
+    source "${repo_dir}/.api_keys"
+    set +a
+fi
+if [[ $# -eq 0 ]]; then
+    set -- deepseek-v3.1-free glm-4.7-free kimi-k2.5-free gemini-3-flash-free
 fi
 git pull -q --rebase --autostash origin main || true
 "${python}" -m pip install -q -e . >/dev/null
