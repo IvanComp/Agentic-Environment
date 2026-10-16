@@ -100,6 +100,22 @@ agentic-quant-metrics campaigns/<campaign>/<model> --out campaigns/<campaign>/<m
 
 It reads every `results.jsonl` below the given folders and writes `metrics.json` and `metrics.md`. `agentic-quant-repeat` does the same at the end.
 
+## Frontier models
+
+The models of Potter et al. run through OpenAI-compatible APIs. Free tiers: `deepseek-v3.1-free` (OpenRouter), `glm-4.7-free` (Cerebras, output capped at 2,048 tokens), `kimi-k2.5-free` (Cloudflare Workers AI), `gemini-3-flash-free` (Google AI Studio). Paid through OpenRouter: `gpt-5.2`, `gemini-3-flash`, `gemini-3-pro`, `claude-haiku-4.5`, `claude-opus-4.5`, `glm-4.7-api`, `kimi-k2.5`, `deepseek-v3.1`.
+
+Put the keys in a file named `.api_keys` in the repo root:
+
+```bash
+OPENROUTER_API_KEY=...
+CEREBRAS_API_KEY=...
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_API_TOKEN=...
+GEMINI_API_KEY=...
+```
+
+Then run `./frontier.sh` (Task 1, 100 waves, the four free models) or `./frontier.sh deepseek-v3.1 --tasks 1 2 3 4`. Each critic run is saved as soon as it ends, so a run stopped by a daily quota continues from there on the next launch. The script archives finished waves in `results/data/frontier/`, rebuilds the tables and pushes them. A request answered by a different model than the one asked for is rejected.
+
 ## LEONARDO
 
 See [leonardo/README.md](leonardo/README.md). The campaign arguments are in `leonardo/experiment.args`.
