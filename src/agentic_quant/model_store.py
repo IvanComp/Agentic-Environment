@@ -50,6 +50,22 @@ def model_status(model_key: str) -> dict[str, Any]:
         }
     if getattr(preset, "backend", "gguf") == "ollama":
         return _ollama_model_status(model_key)
+    if preset.backend == "api":
+        from .api_client import api_key
+
+        ready = bool(api_key())
+        return {
+            **preset.to_dict(),
+            "downloaded": ready,
+            "available": ready,
+            "path": f"api://{preset.ollama_model}",
+            "file_count": 0,
+            "files": [],
+            "bytes_downloaded": 0,
+            "bytes_total": 0,
+            "percent": 100 if ready else 0,
+            "error": "" if ready else "Set AGENTIC_API_KEY or OPENROUTER_API_KEY.",
+        }
 
     paths = model_file_paths(model_key)
     file_statuses = []
@@ -101,6 +117,9 @@ def missing_model_keys(model_keys: list[str]) -> list[str]:
 
 def ensure_models(model_keys: list[str], *, download: bool, progress: Callable[[str, int, int], None] | None = None) -> None:
     missing = missing_model_keys(model_keys)
+    keyless = [key for key in missing if get_model_preset(key).backend == "api"]
+    if keyless:
+        raise RuntimeError("API models need a key in AGENTIC_API_KEY or OPENROUTER_API_KEY: " + ", ".join(keyless))
     if missing and not download:
         labels = ", ".join(get_model_preset(key).label for key in missing)
         if any(getattr(get_model_preset(key), "backend", "gguf") == "ollama" for key in missing):
@@ -124,6 +143,8 @@ def download_model(model_key: str, *, progress: ProgressCallback | None = None) 
 def delete_model(model_key: str) -> list[str]:
     preset = get_model_preset(model_key)
     if model_key == "demo":
+        return []
+    if preset.backend == "api":
         return []
     if getattr(preset, "backend", "gguf") == "ollama":
         delete_ollama_model(preset.ollama_model or model_key)

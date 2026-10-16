@@ -100,6 +100,18 @@ agentic-quant-metrics campaigns/<campaign>/<model> --out campaigns/<campaign>/<m
 
 It reads every `results.jsonl` below the given folders and writes `metrics.json` and `metrics.md`. `agentic-quant-repeat` does the same at the end.
 
+## Frontier models
+
+The eight models of Potter et al. run through an OpenAI-compatible API (OpenRouter by default): `gpt-5.2`, `gemini-3-flash`, `gemini-3-pro`, `claude-haiku-4.5`, `claude-opus-4.5`, `glm-4.7-api`, `kimi-k2.5`, `deepseek-v3.1`.
+
+Put the API key in a file named `.api_key` in the repo root, then run:
+
+```bash
+./frontier.sh deepseek-v3.1 --tasks 1 --waves 100
+```
+
+Completed waves are skipped, so rerunning continues where the last run stopped (for example after a daily quota). The script archives the waves in `results/data/frontier/`, rebuilds the tables and pushes them. `AGENTIC_API_BASE` points to another endpoint; a request answered by a different model than the one asked for is rejected.
+
 ## LEONARDO
 
 See [leonardo/README.md](leonardo/README.md). The campaign arguments are in `leonardo/experiment.args`.

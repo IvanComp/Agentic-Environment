@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from .api_client import api_chat, api_key, response_message, response_thinking
 from .model_registry import get_model_preset
 from .model_store import model_path, model_status
 from .ollama_client import ollama_chat
@@ -612,6 +613,86 @@ class OllamaModelProvider:
         )
 
 
+class ApiModelProvider:
+    name = "api"
+
+    def __init__(self, *, model_key: str, seed: int = 0) -> None:
+        self.preset = get_model_preset(model_key)
+        self.model_key = model_key
+        self.api_model = self.preset.ollama_model or model_key
+        self.seed = seed
+        self.native_tools = True
+        if not api_key():
+            raise RuntimeError(f"{self.preset.label} needs an API key in AGENTIC_API_KEY or OPENROUTER_API_KEY.")
+        self.compute_unit = {"kind": "cloud", "backend": "OpenAI-compatible API", "label": self.api_model, "verified": True}
+
+    def _call(self, messages: list[dict[str, Any]], *, max_tokens: int, temperature: float | None, tools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        return api_chat(model=self.api_model, messages=messages, tools=tools, max_tokens=max_tokens, temperature=temperature, seed=self.seed)
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        system = str((metadata or {}).get("system_prompt") or (
+            "You are a careful reasoning agent. Follow the scenario and evaluation instructions exactly. "
+            "Return only valid JSON with keys answer, confidence, rationale."
+        ))
+        started = time.perf_counter()
+        result = self._call([{"role": "system", "content": system}, {"role": "user", "content": prompt}], max_tokens=max_tokens, temperature=temperature)
+        text = str(response_message(result).get("content") or "").strip()
+        usage = result.get("usage") or {}
+        return LLMResponse(
+            text=text,
+            prompt_tokens=_safe_token_count(usage.get("prompt_tokens"), prompt),
+            completion_tokens=_safe_token_count(usage.get("completion_tokens"), text),
+            elapsed_s=time.perf_counter() - started,
+            model=self.model_key,
+        )
+
+    def judge(self, prompt: str, *, max_tokens: int) -> str:
+        result = self._call([{"role": "user", "content": prompt}], max_tokens=max_tokens, temperature=0.0)
+        return str(response_message(result).get("content") or "").strip()
+
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 256,
+        temperature: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> ChatResponse:
+        started = time.perf_counter()
+        result = self._call(messages, max_tokens=max_tokens, temperature=temperature, tools=tools)
+        message = response_message(result)
+        text = str(message.get("content") or "").strip()
+        tool_calls = [
+            ToolCall(
+                str((call.get("function") or {}).get("name") or ""),
+                _tool_arguments((call.get("function") or {}).get("arguments")),
+            )
+            for call in message.get("tool_calls") or []
+        ]
+        if not tool_calls:
+            tool_calls = inline_tool_calls(text, tools)
+        usage = result.get("usage") or {}
+        return ChatResponse(
+            text=text,
+            tool_calls=tool_calls,
+            prompt_tokens=_safe_token_count(usage.get("prompt_tokens"), json.dumps(messages)),
+            completion_tokens=_safe_token_count(usage.get("completion_tokens"), text),
+            elapsed_s=time.perf_counter() - started,
+            model=self.model_key,
+            native_tools=True,
+            raw={"message": message, "served_model": result.get("model")},
+            thinking=response_thinking(message),
+        )
+
+
 def _unparsable_output(exc: RuntimeError) -> bool:
     text = str(exc)
     return "error parsing tool call" in text or "token repeat limit" in text
@@ -640,6 +721,8 @@ def make_model_provider(
         return HeuristicProvider(seed=seed)
     if preset.backend == "ollama":
         return OllamaModelProvider(model_key=model_key, seed=seed, n_ctx=n_ctx)
+    if preset.backend == "api":
+        return ApiModelProvider(model_key=model_key, seed=seed)
     return GgufModelProvider(
         model_key=model_key,
         n_ctx=n_ctx,
