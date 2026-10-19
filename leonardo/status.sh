@@ -7,7 +7,9 @@ root="${WORK:?WORK is not defined}/Agentic-Environment/campaigns/${name}"
 waves="${2:-10}"
 lines_per_run=6
 runs_per_wave=44
-if [[ "${name}" != tasks234* ]]; then
+if [[ "${name}" == families ]]; then
+    runs_per_wave=48
+elif [[ "${name}" != tasks234* ]]; then
     runs_per_wave=4
 fi
 now="$(date +%s)"
