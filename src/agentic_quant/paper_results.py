@@ -9,8 +9,15 @@ from typing import Any, Iterable
 
 from agentic_quant.metrics import ARCHITECTURE_ORDER, BASELINE_ARCHITECTURE, PEER_CONDITIONS, TASK_OF_SCENARIO, SummaryAccumulator
 
-PAPER_MODELS = ["qwen3_8b", "qwen3_14b", "qwen3_32b"]
-MODEL_ORDER = ["llama3.1_8b", "qwen3_8b", "qwen3_14b", "mistral-small3.2_24b", "qwen3_32b", "llama3.3_70b"]
+PAPER_MODELS = [
+    "qwen3_8b", "qwen3_14b", "qwen3_32b",
+    "gemma4_e4b", "gemma4_12b", "gemma4_31b",
+    "granite4.1_3b", "granite4.1_8b", "granite4.1_30b",
+    "ministral-3_3b", "ministral-3_8b", "ministral-3_14b",
+    "nemotron-3-nano_4b", "nemotron-3-nano_30b",
+    "gpt-oss_20b",
+]
+MODEL_ORDER = PAPER_MODELS + ["llama3.1_8b", "mistral-small3.2_24b", "llama3.3_70b"]
 MODEL_LABELS = {
     "llama3.1_8b": "Llama 3.1 8B",
     "qwen3_8b": "Qwen3 8B",
@@ -18,6 +25,18 @@ MODEL_LABELS = {
     "mistral-small3.2_24b": "Mistral Small 3.2 24B",
     "qwen3_32b": "Qwen3 32B",
     "llama3.3_70b": "Llama 3.3 70B",
+    "gemma4_e4b": "Gemma 4 E4B",
+    "gemma4_12b": "Gemma 4 12B",
+    "gemma4_31b": "Gemma 4 31B",
+    "granite4.1_3b": "Granite 4.1 3B",
+    "granite4.1_8b": "Granite 4.1 8B",
+    "granite4.1_30b": "Granite 4.1 30B",
+    "ministral-3_3b": "Ministral 3 3B",
+    "ministral-3_8b": "Ministral 3 8B",
+    "ministral-3_14b": "Ministral 3 14B",
+    "nemotron-3-nano_4b": "Nemotron 3 Nano 4B",
+    "nemotron-3-nano_30b": "Nemotron 3 Nano 30B",
+    "gpt-oss_20b": "GPT-OSS 20B",
 }
 ARCHITECTURE_SHORT = {
     "baseline": "Base",
