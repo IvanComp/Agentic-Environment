@@ -32,7 +32,10 @@ waiting=0
 for model in "${MODELS[@]}"; do
     slug="$(printf '%s' "${model}" | tr -c 'A-Za-z0-9._-' '_')"
     dir="${root}/${slug}"
-    done_waves="$(find "${dir}" -mindepth 2 -maxdepth 2 -name .complete.json 2>/dev/null | wc -l)"
+    done_waves=0
+    if [[ -d "${dir}" ]]; then
+        done_waves="$(find "${dir}" -mindepth 2 -maxdepth 2 -name .complete.json | wc -l)"
+    fi
     if (( done_waves >= WAVES )); then
         echo "${model}: complete"
         continue
@@ -41,7 +44,7 @@ for model in "${MODELS[@]}"; do
         echo "${model}: running, ${done_waves}/${WAVES} waves done"
         continue
     fi
-    queued="$(squeue -h -r -u "${user}" 2>/dev/null | wc -l)"
+    queued="$(squeue -h -r -u "${user}" | wc -l)"
     if (( queued + needed > LIMIT )); then
         echo "${model}: waiting for free slots"
         waiting=$(( waiting + 1 ))
