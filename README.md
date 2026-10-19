@@ -114,7 +114,7 @@ CLOUDFLARE_API_TOKEN=...
 GEMINI_API_KEY=...
 ```
 
-Then run `./frontier.sh` (Task 1, 100 waves, the four free models) or `./frontier.sh deepseek-v3.1 --tasks 1 2 3 4`. Each critic run is saved as soon as it ends, so a run stopped by a daily quota continues from there on the next launch. The script archives finished waves in `results/data/frontier/`, rebuilds the tables and pushes them. A request answered by a different model than the one asked for is rejected.
+Then run `./frontier.sh` (Task 1, 10 waves, the four free models) or `./frontier.sh deepseek-v3.1 --tasks 1 2 3 4`. Each critic run is saved as soon as it ends, so a run stopped by a daily quota continues from there on the next launch. The script archives finished waves in `results/data/frontier/`, rebuilds the tables and pushes them. A request answered by a different model than the one asked for is rejected.
 
 ## LEONARDO
 

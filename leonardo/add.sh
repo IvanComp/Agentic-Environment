@@ -13,11 +13,7 @@ if [[ "${name}" == tasks234* ]]; then
 fi
 unset AGENTIC_RESULTS_ROOT AGENTIC_SEED_START AGENTIC_SEED_STEP
 slug="$(printf '%s' "${model}" | tr -c 'A-Za-z0-9._-' '_')"
-done_waves="$(find "${root}/${slug}" -maxdepth 2 -name .complete.json 2>/dev/null | wc -l)"
-waves=$(( done_waves + 10 ))
-if (( waves > 100 )); then
-    waves=100
-fi
+waves=10
 export AGENTIC_CAMPAIGN_NAME="${name}" AGENTIC_WAVES="${waves}" AGENTIC_WAVES_PER_JOB="${waves}" AGENTIC_EXPERIMENT_FILE="${experiment}"
 export AGENTIC_WAVE_SBATCH_ARGS="--time=24:00:00 $(model_resources "${model}")"
 submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" 1)"
