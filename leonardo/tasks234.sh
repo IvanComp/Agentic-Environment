@@ -10,18 +10,7 @@ git reset -q --hard origin/main
 if (( $# > 0 )); then
     MODELS=("$@")
 fi
-done_waves=0
-for dir in "${WORK:?WORK is not defined}/Agentic-Environment/campaigns/${NAME}"/*/; do
-    [[ -d "${dir}" ]] || continue
-    count="$(find "${dir}" -maxdepth 2 -name .complete.json | wc -l)"
-    if (( count > done_waves )); then
-        done_waves="${count}"
-    fi
-done
-waves=$(( done_waves + 10 ))
-if (( waves > 100 )); then
-    waves=100
-fi
+waves=10
 echo "Waves 1-${waves} per model, completed waves are skipped."
 AGENTIC_NIGHT_NAME="${NAME}" \
 AGENTIC_EXPERIMENT_FILE=experiment-tasks234.args \

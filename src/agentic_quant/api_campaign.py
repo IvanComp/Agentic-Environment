@@ -108,7 +108,7 @@ def main() -> None:
     parser.add_argument("models", nargs="*")
     parser.add_argument("--campaign", default="frontier")
     parser.add_argument("--root", type=Path, default=Path("campaigns"))
-    parser.add_argument("--waves", type=int, default=100)
+    parser.add_argument("--waves", type=int, default=10)
     parser.add_argument("--tasks", nargs="+", default=["1"], choices=sorted(TASKS))
     args = parser.parse_args()
     unknown = [model for model in args.models if model not in api_models()]

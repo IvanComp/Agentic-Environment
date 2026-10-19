@@ -13,7 +13,7 @@ main() {
     fi
     case "${name}" in
         test) waves=1 per_job=1 wave_options="${test_time} ${resources}" ;;
-        campaign) waves=100 per_job=10 wave_options="${campaign_time} ${resources}" ;;
+        campaign) waves=10 per_job=10 wave_options="${campaign_time} ${resources}" ;;
         *) echo "Usage: launch.sh test|campaign [model]" >&2; exit 2 ;;
     esac
     local repo_dir
