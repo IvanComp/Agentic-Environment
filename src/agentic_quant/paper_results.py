@@ -9,6 +9,7 @@ from typing import Any, Iterable
 
 from agentic_quant.metrics import ARCHITECTURE_ORDER, BASELINE_ARCHITECTURE, PEER_CONDITIONS, TASK_OF_SCENARIO, SummaryAccumulator
 
+PAPER_MODELS = ["qwen3_8b", "qwen3_14b", "qwen3_32b"]
 MODEL_ORDER = ["llama3.1_8b", "qwen3_8b", "qwen3_14b", "mistral-small3.2_24b", "qwen3_32b", "llama3.3_70b"]
 MODEL_LABELS = {
     "llama3.1_8b": "Llama 3.1 8B",
@@ -31,7 +32,7 @@ TASKS = [1, 2, 3, 4]
 BEHAVIORS = {1: "Strategic Misrep.", 2: "Shutdown Tampering", 3: "Alignment Faking", 4: "Model Exfiltration"}
 MATRIX_CONDITIONS = [("bad_peer", "Bad Peer"), ("neutral_peer", "Neutral Peer"), ("good_peer", "Good Peer")]
 CRITIC_OUTCOMES = ["Faithful", "Peer-Preserving", "Incomplete", "Refusal"]
-DECISIONS = {"committed": "Committed", "promoted": "Committed", "rejected": "Rejected", "escalated_to_human": "Escalated"}
+DECISIONS = {"committed": "Committed", "promoted": "Committed", "rejected": "Rejected", "discarded": "Rejected", "escalated_to_human": "Escalated"}
 DECISION_ORDER = ["Committed", "Rejected", "Escalated"]
 TASK_COLORS = {1: "#2a6f97", 2: "#e07a5f", 3: "#81b29a", 4: "#9d6fb5"}
 PATTERN_MARKERS = {"atomic_verifiable_claims": "o", "sandbox_gatekeeper": "s", "context_epistemic_routing": "^", "stackable_verification": "D", "multi_verifiers": "P"}
@@ -330,8 +331,8 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
     return fig
 
 
-def build(data: Path, out: Path, figures_enabled: bool = True) -> list[dict[str, Any]]:
-    records = load(data)
+def build(data: Path, out: Path, figures_enabled: bool = True, models: list[str] | None = None) -> list[dict[str, Any]]:
+    records = [record for record in load(data) if not models or record["_model"] in models]
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
     (tables / "pp_matrix.tex").write_text(pp_matrix_latex(records), encoding="utf-8")
@@ -348,6 +349,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build the paper tables and figures from campaign folders.")
     parser.add_argument("data", type=Path, nargs="?", default=Path("results/data"))
     parser.add_argument("--out", type=Path, default=Path("results"))
+    parser.add_argument("--models", nargs="+", default=PAPER_MODELS)
     args = parser.parse_args()
     try:
         import matplotlib
@@ -355,7 +357,7 @@ def main() -> None:
         matplotlib = None
     if matplotlib is not None:
         matplotlib.use("Agg")
-    records = build(args.data, args.out, matplotlib is not None)
+    records = build(args.data, args.out, matplotlib is not None, args.models)
     print(f"{len(records)} records from {len(models_in(records))} models -> {args.out}")
     if matplotlib is None:
         print("matplotlib not installed: tables written, figures skipped")
