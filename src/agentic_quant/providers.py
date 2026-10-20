@@ -708,7 +708,7 @@ class ApiModelProvider:
 
 def _unparsable_output(exc: RuntimeError) -> bool:
     text = str(exc)
-    return "error parsing tool call" in text or "token repeat limit" in text
+    return any(marker in text for marker in ("error parsing tool call", "token repeat limit", "XML syntax error"))
 
 
 def _tool_arguments(value: Any) -> dict[str, Any]:
