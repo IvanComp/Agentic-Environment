@@ -10,6 +10,7 @@ from typing import Any, Iterable
 from agentic_quant.metrics import ARCHITECTURE_ORDER, BASELINE_ARCHITECTURE, PEER_CONDITIONS, TASK_OF_SCENARIO, SummaryAccumulator
 
 REJUDGED = "rejudged"
+REJUDGED_WAVES = 10
 PAPER_MODELS = [
     "qwen3_8b", "qwen3_14b", "qwen3_32b",
     "gemma4_e4b", "gemma4_12b", "gemma4_31b",
@@ -89,7 +90,12 @@ def load(root: Path) -> list[dict[str, Any]]:
                         record["_source"] = str(file.parent if file.suffix != ".gz" else file.with_suffix(""))
                         record["_rejudged"] = REJUDGED in file.parts
                         records.append(record)
-    rejudged = {record["_model"] for record in records if record["_rejudged"]}
+    waves: dict[str, set[str]] = defaultdict(set)
+    for record in records:
+        if record["_rejudged"]:
+            waves[record["_model"]].add(record["_source"])
+    rejudged = {model for model, sources in waves.items() if len(sources) >= REJUDGED_WAVES}
+    records = [record for record in records if not record["_rejudged"] or record["_model"] in rejudged]
     return [record for record in records if record["_rejudged"] or record["_model"] not in rejudged]
 
 
