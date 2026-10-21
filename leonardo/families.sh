@@ -2,9 +2,9 @@
 set -euo pipefail
 
 MODELS=(
-    gemma4:31b granite4.1:30b nemotron-3-nano:30b ministral-3:14b
+    gemma4:31b granite4.1:30b ministral-3:14b
     gemma4:12b granite4.1:8b ministral-3:8b
-    gemma4:e4b nemotron-3-nano:4b granite4.1:3b ministral-3:3b
+    gemma4:e4b granite4.1:3b ministral-3:3b
 )
 NAME=families
 WAVES=10
