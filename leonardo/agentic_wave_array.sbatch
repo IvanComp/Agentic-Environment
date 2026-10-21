@@ -121,12 +121,22 @@ for (( wave = first_wave; wave <= last_wave; wave++ )); do
     "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L >"${wave_dir}/gpus.txt"
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py status "${model}" >"${wave_dir}/model_status_before.json"
 
-    "${repo_dir}/leonardo/container_exec.sh" \
-        python3 -u -m agentic_quant.run_benchmark \
-        --model "${model}" \
-        --seed "${seed}" \
-        --out "${wave_dir}" \
-        "${experiment_args[@]}" &
+    if [[ -n "${AGENTIC_REJUDGE_SOURCES:-}" ]]; then
+        sources=()
+        IFS=':' read -r -a source_roots <<<"${AGENTIC_REJUDGE_SOURCES}"
+        for source_root in "${source_roots[@]}"; do
+            sources+=("${source_root}/wave_$(printf '%02d' "${wave}")")
+        done
+        "${repo_dir}/leonardo/container_exec.sh" \
+            python3 -u -m agentic_quant.rejudge "${sources[@]}" --out "${wave_dir}" &
+    else
+        "${repo_dir}/leonardo/container_exec.sh" \
+            python3 -u -m agentic_quant.run_benchmark \
+            --model "${model}" \
+            --seed "${seed}" \
+            --out "${wave_dir}" \
+            "${experiment_args[@]}" &
+    fi
     experiment_pid=$!
     wait "${experiment_pid}"
     experiment_pid=""
