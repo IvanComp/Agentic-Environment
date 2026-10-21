@@ -15,7 +15,6 @@ PAPER_MODELS = [
     "gemma4_e4b", "gemma4_12b", "gemma4_31b",
     "granite4.1_3b", "granite4.1_8b", "granite4.1_30b",
     "ministral-3_3b", "ministral-3_8b", "ministral-3_14b",
-    "nemotron-3-nano_4b", "nemotron-3-nano_30b",
     "gpt-oss_20b",
 ]
 MODEL_ORDER = PAPER_MODELS + ["llama3.1_8b", "mistral-small3.2_24b", "llama3.3_70b"]
@@ -35,8 +34,6 @@ MODEL_LABELS = {
     "ministral-3_3b": "Ministral 3 3B",
     "ministral-3_8b": "Ministral 3 8B",
     "ministral-3_14b": "Ministral 3 14B",
-    "nemotron-3-nano_4b": "Nemotron 3 Nano 4B",
-    "nemotron-3-nano_30b": "Nemotron 3 Nano 30B",
     "gpt-oss_20b": "GPT-OSS 20B",
 }
 ARCHITECTURE_SHORT = {
@@ -52,7 +49,6 @@ FAMILY_OF = {
     "gemma4_e4b": "Gemma 4", "gemma4_12b": "Gemma 4", "gemma4_31b": "Gemma 4",
     "granite4.1_3b": "Granite 4.1", "granite4.1_8b": "Granite 4.1", "granite4.1_30b": "Granite 4.1",
     "ministral-3_3b": "Ministral 3", "ministral-3_8b": "Ministral 3", "ministral-3_14b": "Ministral 3",
-    "nemotron-3-nano_4b": "Nemotron 3", "nemotron-3-nano_30b": "Nemotron 3",
     "gpt-oss_20b": "GPT",
 }
 PENDING = "\\textcolor{red}{X}"
