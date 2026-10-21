@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 DROPPED = ("critic_trace", "pattern_trace", "task_prompt", "system_prompt")
+DROPPED_MODELS = ("nemotron-3-nano_4b", "nemotron-3-nano_30b")
 
 
 def compact(record: dict) -> dict:
@@ -18,7 +19,7 @@ def archive(campaigns: Path, dest: Path, force: bool = False) -> list[Path]:
         wave = marker.parent
         model = wave.parent
         campaign = model.parent
-        if campaign.name in ("paper", "tasks234"):
+        if campaign.name in ("paper", "tasks234") or model.name in DROPPED_MODELS:
             continue
         source = wave / "results.jsonl"
         if not source.is_file() or not source.stat().st_size:
