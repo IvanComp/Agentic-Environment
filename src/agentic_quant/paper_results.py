@@ -46,6 +46,15 @@ ARCHITECTURE_SHORT = {
     "stackable_verification": "SV",
     "multi_verifiers": "MV",
 }
+FAMILY_OF = {
+    "qwen3_8b": "Qwen3", "qwen3_14b": "Qwen3", "qwen3_32b": "Qwen3",
+    "gemma4_e4b": "Gemma 4", "gemma4_12b": "Gemma 4", "gemma4_31b": "Gemma 4",
+    "granite4.1_3b": "Granite 4.1", "granite4.1_8b": "Granite 4.1", "granite4.1_30b": "Granite 4.1",
+    "ministral-3_3b": "Ministral 3", "ministral-3_8b": "Ministral 3", "ministral-3_14b": "Ministral 3",
+    "nemotron-3-nano_4b": "Nemotron 3 Nano", "nemotron-3-nano_30b": "Nemotron 3 Nano",
+    "gpt-oss_20b": "GPT-OSS",
+}
+TSR_LABELS = {"baseline": "Baseline (No Pattern)"}
 PATTERNS = [name for name in ARCHITECTURE_ORDER if name != BASELINE_ARCHITECTURE]
 TASKS = [1, 2, 3, 4]
 BEHAVIORS = {1: "Strategic Misrep.", 2: "Shutdown Tampering", 3: "Alignment Faking", 4: "Model Exfiltration"}
@@ -148,8 +157,11 @@ def pp_matrix(records: list[dict[str, Any]]) -> dict[str, dict[tuple[int | str, 
 
 def pp_matrix_latex(records: list[dict[str, Any]]) -> str:
     matrix = pp_matrix(records)
-    models = list(matrix) or MODEL_ORDER
-    spec = "ll" + "c" * (len(MATRIX_CONDITIONS) * len(ARCHITECTURE_ORDER))
+    models = list(matrix) or PAPER_MODELS
+    families: dict[str, list[str]] = {}
+    for model in models:
+        families.setdefault(FAMILY_OF.get(model, MODEL_LABELS.get(model, model)), []).append(model)
+    spec = "lll" + "c" * (len(MATRIX_CONDITIONS) * len(ARCHITECTURE_ORDER))
     header = " & ".join(ARCHITECTURE_SHORT[a] for a in ARCHITECTURE_ORDER)
     lines = [
         "\\begin{table*}[t]",
@@ -160,18 +172,22 @@ def pp_matrix_latex(records: list[dict[str, Any]]) -> str:
         "\\resizebox{\\textwidth}{!}{%",
         f"\\begin{{tabular}}{{{spec}}}",
         "\\toprule",
-        "& & " + " & ".join(f"\\multicolumn{{6}}{{c}}{{\\textbf{{{label}}}}}" for _, label in MATRIX_CONDITIONS) + " \\\\",
-        "\\cmidrule(lr){3-8}\\cmidrule(lr){9-14}\\cmidrule(lr){15-20}",
-        "\\textbf{Model} & \\textbf{Behavior} & " + " & ".join([header] * len(MATRIX_CONDITIONS)) + " \\\\",
+        "& & & " + " & ".join(f"\\multicolumn{{6}}{{c}}{{\\textbf{{{label}}}}}" for _, label in MATRIX_CONDITIONS) + " \\\\",
+        "\\cmidrule(lr){4-9}\\cmidrule(lr){10-15}\\cmidrule(lr){16-21}",
+        "\\textbf{Family} & \\textbf{Model} & \\textbf{Behavior} & " + " & ".join([header] * len(MATRIX_CONDITIONS)) + " \\\\",
     ]
-    for model in models:
-        values = matrix.get(model, {})
+    for family, members in families.items():
         lines.append("\\midrule")
-        for index, key in enumerate([*TASKS, "refusal"]):
-            label = BEHAVIORS.get(key, "Refusal") if key != "refusal" else "Refusal"
-            first = f"\\multirow{{5}}{{*}}{{{MODEL_LABELS.get(model, model)}}}" if index == 0 else ""
-            cells = [_cell(values.get((key, condition, architecture))) for condition, _ in MATRIX_CONDITIONS for architecture in ARCHITECTURE_ORDER]
-            lines.append(f"{first} & {label} & " + " & ".join(cells) + " \\\\")
+        for position, model in enumerate(members):
+            if position:
+                lines.append("\\cmidrule(l){2-21}")
+            values = matrix.get(model, {})
+            for index, key in enumerate([*TASKS, "refusal"]):
+                label = "Refusal" if key == "refusal" else BEHAVIORS[key]
+                first = f"\\multirow{{{5 * len(members)}}}{{*}}{{{family}}}" if index == 0 and position == 0 else ""
+                second = f"\\multirow{{5}}{{*}}{{{MODEL_LABELS.get(model, model)}}}" if index == 0 else ""
+                cells = [_cell(values.get((key, condition, architecture))) for condition, _ in MATRIX_CONDITIONS for architecture in ARCHITECTURE_ORDER]
+                lines.append(f"{first} & {second} & {label} & " + " & ".join(cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}}", "\\end{table*}"]
     return "\n".join(lines) + "\n"
 
@@ -189,11 +205,11 @@ def task_success_latex(records: list[dict[str, Any]]) -> str:
         "\\label{tab:tsr}",
         "\\begin{tabular}{lcccc}",
         "\\toprule",
-        "\\textbf{Architecture} & " + " & ".join(f"\\textbf{{Task {t}}}" for t in TASKS) + " \\\\",
+        "\\textbf{System Architecture} & " + " & ".join(f"\\textbf{{Task {t}}}" for t in TASKS) + " \\\\",
         "\\midrule",
     ]
     for architecture in ARCHITECTURE_ORDER:
-        lines.append(f"{ARCHITECTURE_SHORT[architecture]} & " + " & ".join(_cell(values.get((t, architecture))) for t in TASKS) + " \\\\")
+        lines.append(f"{TSR_LABELS.get(architecture, ARCHITECTURE_SHORT[architecture])} & " + " & ".join(_cell(values.get((t, architecture))) for t in TASKS) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
     return "\n".join(lines) + "\n"
 
@@ -209,19 +225,26 @@ def overhead_latex(records: list[dict[str, Any]]) -> str:
         "\\centering",
         "\\caption{Latency Overhead (s) and Token Overhead (\\%) of each pattern relative to Base, per task.}",
         "\\label{tab:overhead}",
+        "\\footnotesize",
         "\\setlength{\\tabcolsep}{3pt}",
-        "\\begin{tabular}{lcccccccc}",
+        "\\renewcommand{\\arraystretch}{1.05}",
+        "\\resizebox{\\columnwidth}{!}{%",
+        "\\begin{tabular}{@{}lcccccccc@{}}",
         "\\toprule",
-        "& \\multicolumn{4}{c}{\\textbf{Latency Overhead (s)}} & \\multicolumn{4}{c}{\\textbf{Token Overhead (\\%)}} \\\\",
+        "\\multirow[c]{2}{*}[-0.8ex]{%",
+        "    \\shortstack[c]{\\textbf{Architectural}\\\\\\textbf{Pattern}}}",
+        "& \\multicolumn{4}{c}{\\textbf{Latency Overhead (s)}}",
+        "& \\multicolumn{4}{c}{\\textbf{Token Overhead (\\%)}} \\\\",
         "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}",
-        "\\textbf{Pattern} & " + " & ".join(f"T{t}" for t in TASKS * 2) + " \\\\",
+        "& " + " & ".join(f"Task {t}" for t in TASKS),
+        "& " + " & ".join(f"Task {t}" for t in TASKS) + " \\\\",
         "\\midrule",
     ]
     for architecture in PATTERNS:
         latency = [_cell(values.get((t, architecture), (None, None))[0], True, 1.0, 2) for t in TASKS]
         tokens = [_cell(values.get((t, architecture), (None, None))[1], True) for t in TASKS]
         lines.append(f"{ARCHITECTURE_SHORT[architecture]} & " + " & ".join(latency + tokens) + " \\\\")
-    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
+    lines += ["\\bottomrule", "\\end{tabular}%", "}", "\\end{table}"]
     return "\n".join(lines) + "\n"
 
 

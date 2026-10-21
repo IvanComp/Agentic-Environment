@@ -3,7 +3,7 @@
 Builds the paper tables and figures from campaign outputs.
 
 1. On the cluster, `./leonardo/save.sh` stores every completed wave in `results/data/<campaign>/<model>/wave_NN.jsonl.gz` (results without the agent traces), rebuilds the tables and pushes both to GitHub. Waves already saved are kept, so campaigns can be deleted afterwards. Run `./leonardo/github_login.sh` once before the first save.
-2. On a laptop, `git pull`, open `results/paper_results.ipynb` and run all cells, or run `agentic-quant-paper results/data --out results`. Raw `results.jsonl` folders copied into `results/data/` are read too.
+2. On a laptop, `git pull`, open `results/paper_results.ipynb` and run all cells (each cell shows one table or figure of the Results section, laid out as in the paper), or run `agentic-quant-paper results/data --out results`. Raw `results.jsonl` folders copied into `results/data/` are read too.
 
 | Output | Content | RQ |
 |---|---|---|
