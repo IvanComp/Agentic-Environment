@@ -9,7 +9,9 @@ MODELS=(
 )
 NAME=rejudged
 WAVES=10
-PER_JOB=5
+PER_JOB=10
+PARALLEL=4
+LAYOUT=parallel-10
 LIMIT=15
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -45,7 +47,7 @@ complete_waves() {
 
 ./leonardo/prepare_cuda.sh >/dev/null
 unset AGENTIC_RESULTS_ROOT AGENTIC_SEED_START AGENTIC_SEED_STEP
-export AGENTIC_CAMPAIGN_NAME="${NAME}" AGENTIC_WAVES="${WAVES}" AGENTIC_WAVES_PER_JOB="${PER_JOB}" AGENTIC_EXPERIMENT_FILE=experiment-all.args
+export AGENTIC_CAMPAIGN_NAME="${NAME}" AGENTIC_WAVES="${WAVES}" AGENTIC_WAVES_PER_JOB="${PER_JOB}" AGENTIC_EXPERIMENT_FILE=experiment-all.args AGENTIC_OLLAMA_PARALLEL="${PARALLEL}"
 waiting=0
 for model in "${MODELS[@]}"; do
     slug="$(printf '%s' "${model}" | tr -c 'A-Za-z0-9._-' '_')"
@@ -68,9 +70,17 @@ for model in "${MODELS[@]}"; do
         echo "${model}: complete"
         continue
     fi
-    if [[ -s "${dir}/jobs.txt" ]] && squeue -h -j "$(tr -s ' ' ',' <"${dir}/jobs.txt" | sed 's/,$//')" 2>/dev/null | grep -q .; then
-        echo "${model}: running, ${done_waves}/${WAVES} waves done"
-        continue
+    if [[ -s "${dir}/jobs.txt" ]]; then
+        job_list="$(tr -s ' ' ',' <"${dir}/jobs.txt" | sed 's/,$//')"
+        states="$(squeue -h -o %T -j "${job_list}" 2>/dev/null || true)"
+        if [[ -n "${states}" ]]; then
+            if [[ "$(cat "${dir}/layout" 2>/dev/null)" == "${LAYOUT}" ]] || grep -q RUNNING <<<"${states}"; then
+                echo "${model}: running, ${done_waves}/${WAVES} waves done"
+                continue
+            fi
+            scancel ${job_list//,/ }
+            echo "${model}: old queued jobs cancelled, submitting the faster layout"
+        fi
     fi
     queued="$(squeue -h -r -u "${user}" | wc -l)"
     if (( queued + needed > LIMIT )); then
@@ -87,6 +97,7 @@ for model in "${MODELS[@]}"; do
     fi
     mkdir -p "${dir}"
     printf '%s\n' "${submitted}" | sed -n 's/^\(prepare\|wave\|cleanup\)_job=//p' | tr '\n' ' ' >"${dir}/jobs.txt"
+    printf '%s\n' "${LAYOUT}" >"${dir}/layout"
     echo "${model}: submitted, jobs $(cat "${dir}/jobs.txt")"
 done
 if (( waiting > 0 )); then

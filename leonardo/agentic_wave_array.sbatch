@@ -64,11 +64,12 @@ export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 ollama_pid=""
 experiment_pid=""
+wave_pids=()
 cleanup() {
-    if [[ -n "${experiment_pid}" ]]; then
-        kill -TERM "${experiment_pid}" 2>/dev/null || true
-        wait "${experiment_pid}" 2>/dev/null || true
-    fi
+    for pid in ${experiment_pid} ${wave_pids[@]+"${wave_pids[@]}"}; do
+        kill -TERM "${pid}" 2>/dev/null || true
+        wait "${pid}" 2>/dev/null || true
+    done
     if [[ -n "${ollama_pid}" ]]; then
         kill -TERM "${ollama_pid}" 2>/dev/null || true
         wait "${ollama_pid}" 2>/dev/null || true
@@ -85,6 +86,9 @@ if [[ "${backend}" == "ollama" ]]; then
     compat_dir="${cache_home}/cuda-compat-12-8"
     ollama_cuda_dir="${cache_home}/ollama-cuda12"
     cat "${ollama_cuda_dir}"/* "${compat_dir}"/* >/dev/null
+    if [[ -n "${AGENTIC_OLLAMA_PARALLEL:-}" ]]; then
+        export OLLAMA_NUM_PARALLEL="${AGENTIC_OLLAMA_PARALLEL}"
+    fi
     AGENTIC_OLLAMA_CUDA_DIR="${ollama_cuda_dir}" OLLAMA_DEBUG=1 OLLAMA_LLM_LIBRARY=cuda_v13 OLLAMA_LOAD_TIMEOUT=30m \
         "${repo_dir}/leonardo/container_exec.sh" \
         sh -c "LD_LIBRARY_PATH=${compat_dir}:\${LD_LIBRARY_PATH:-} exec ollama serve" >"${ollama_log}" 2>&1 &
@@ -110,36 +114,30 @@ while IFS= read -r argument || [[ -n "${argument}" ]]; do
     experiment_args+=("${argument}")
 done <"${task_repo}/leonardo/${AGENTIC_EXPERIMENT_FILE:-experiment.args}"
 
-for (( wave = first_wave; wave <= last_wave; wave++ )); do
-    if wave_done "${wave}"; then
-        echo "Wave ${wave} already complete; skipping."
-        continue
-    fi
-    seed="$((seed_start + (wave - 1) * seed_step))"
-    wave_dir="${campaign_root}/wave_$(printf '%02d' "${wave}")"
+run_wave() {
+    local wave="$1"
+    local seed="$((seed_start + (wave - 1) * seed_step))"
+    local wave_dir="${campaign_root}/wave_$(printf '%02d' "${wave}")"
     mkdir -p "${wave_dir}"
     "${repo_dir}/leonardo/container_exec.sh" nvidia-smi -L >"${wave_dir}/gpus.txt"
     "${repo_dir}/leonardo/container_exec.sh" python3 leonardo/model_cache.py status "${model}" >"${wave_dir}/model_status_before.json"
 
     if [[ -n "${AGENTIC_REJUDGE_SOURCES:-}" ]]; then
-        sources=()
+        local sources=()
         IFS=':' read -r -a source_roots <<<"${AGENTIC_REJUDGE_SOURCES}"
         for source_root in "${source_roots[@]}"; do
             sources+=("${source_root}/wave_$(printf '%02d' "${wave}")")
         done
         "${repo_dir}/leonardo/container_exec.sh" \
-            python3 -u -m agentic_quant.rejudge "${sources[@]}" --out "${wave_dir}" &
+            python3 -u -m agentic_quant.rejudge "${sources[@]}" --out "${wave_dir}"
     else
         "${repo_dir}/leonardo/container_exec.sh" \
             python3 -u -m agentic_quant.run_benchmark \
             --model "${model}" \
             --seed "${seed}" \
             --out "${wave_dir}" \
-            "${experiment_args[@]}" &
+            "${experiment_args[@]}"
     fi
-    experiment_pid=$!
-    wait "${experiment_pid}"
-    experiment_pid=""
 
     python3 - "${wave_dir}/.complete.json" "${model}" "${seed}" "${wave}" <<'PY'
 import json
@@ -164,4 +162,26 @@ temporary.replace(path)
 PY
 
     echo "WAVE COMPLETE: model=${model} wave=${wave} seed=${seed} node=${SLURMD_NODENAME:-unknown}"
+}
+
+wave_pids=()
+for (( wave = first_wave; wave <= last_wave; wave++ )); do
+    if wave_done "${wave}"; then
+        echo "Wave ${wave} already complete; skipping."
+        continue
+    fi
+    if [[ -n "${AGENTIC_REJUDGE_SOURCES:-}" ]]; then
+        run_wave "${wave}" &
+        wave_pids+=("$!")
+    else
+        run_wave "${wave}" &
+        experiment_pid=$!
+        wait "${experiment_pid}"
+        experiment_pid=""
+    fi
 done
+failed=0
+for pid in ${wave_pids[@]+"${wave_pids[@]}"}; do
+    wait "${pid}" || failed=1
+done
+exit "${failed}"
