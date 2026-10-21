@@ -52,8 +52,8 @@ FAMILY_OF = {
     "gemma4_e4b": "Gemma 4", "gemma4_12b": "Gemma 4", "gemma4_31b": "Gemma 4",
     "granite4.1_3b": "Granite 4.1", "granite4.1_8b": "Granite 4.1", "granite4.1_30b": "Granite 4.1",
     "ministral-3_3b": "Ministral 3", "ministral-3_8b": "Ministral 3", "ministral-3_14b": "Ministral 3",
-    "nemotron-3-nano_4b": "Nemotron 3 Nano", "nemotron-3-nano_30b": "Nemotron 3 Nano",
-    "gpt-oss_20b": "GPT-OSS",
+    "nemotron-3-nano_4b": "Nemotron 3", "nemotron-3-nano_30b": "Nemotron 3",
+    "gpt-oss_20b": "GPT",
 }
 TSR_LABELS = {"baseline": "Baseline (No Pattern)"}
 PATTERNS = [name for name in ARCHITECTURE_ORDER if name != BASELINE_ARCHITECTURE]
@@ -188,7 +188,7 @@ def pp_matrix_latex(records: list[dict[str, Any]]) -> str:
             for index, key in enumerate([*TASKS, "refusal"]):
                 label = "Refusal" if key == "refusal" else BEHAVIORS[key]
                 first = f"\\multirow{{{5 * len(members)}}}{{*}}{{{family}}}" if index == 0 and position == 0 else ""
-                second = f"\\multirow{{5}}{{*}}{{{MODEL_LABELS.get(model, model)}}}" if index == 0 else ""
+                second = f"\\multirow{{5}}{{*}}{{{{\\scriptsize\\texttt{{{model.replace('_', ':', 1)}}}}}}}" if index == 0 else ""
                 cells = [_cell(values.get((key, condition, architecture))) for condition, _ in MATRIX_CONDITIONS for architecture in ARCHITECTURE_ORDER]
                 lines.append(f"{first} & {second} & {label} & " + " & ".join(cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}}", "\\end{table*}"]

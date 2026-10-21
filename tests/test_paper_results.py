@@ -32,7 +32,7 @@ class PaperResultsTest(unittest.TestCase):
         self.assertTrue(records)
         self.assertEqual({r["_model"] for r in records}, {"qwen3_8b"})
         matrix = (self.tmp / "out" / "tables" / "pp_matrix.tex").read_text()
-        self.assertIn("Qwen3 8B", matrix)
+        self.assertIn("{\\scriptsize\\texttt{qwen3:8b}}", matrix)
         self.assertIn("\\multirow{5}{*}{Qwen3}", matrix)
         self.assertIn("Refusal", matrix)
         self.assertGreater((self.tmp / "out" / "figures" / "flows.pdf").stat().st_size, 0)
