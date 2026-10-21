@@ -9,6 +9,7 @@ from typing import Any, Iterable
 
 from agentic_quant.metrics import ARCHITECTURE_ORDER, BASELINE_ARCHITECTURE, PEER_CONDITIONS, TASK_OF_SCENARIO, SummaryAccumulator
 
+REJUDGED = "rejudged"
 PAPER_MODELS = [
     "qwen3_8b", "qwen3_14b", "qwen3_32b",
     "gemma4_e4b", "gemma4_12b", "gemma4_31b",
@@ -89,8 +90,10 @@ def load(root: Path) -> list[dict[str, Any]]:
                     if record.get("scenario") in TASK_OF_SCENARIO:
                         record["_model"] = model
                         record["_source"] = str(file.parent if file.suffix != ".gz" else file.with_suffix(""))
+                        record["_rejudged"] = REJUDGED in file.parts
                         records.append(record)
-    return records
+    rejudged = {record["_model"] for record in records if record["_rejudged"]}
+    return [record for record in records if record["_rejudged"] or record["_model"] not in rejudged]
 
 
 def models_in(records: Iterable[dict[str, Any]]) -> list[str]:

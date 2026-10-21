@@ -35,5 +35,11 @@ fi
 if [[ -n "${AGENTIC_OUTPUT_ROOT:-}" ]]; then
     args+=(--bind "${AGENTIC_OUTPUT_ROOT}:${AGENTIC_OUTPUT_ROOT}")
 fi
+if [[ -n "${AGENTIC_REJUDGE_SOURCES:-}" ]]; then
+    IFS=':' read -r -a rejudge_roots <<<"${AGENTIC_REJUDGE_SOURCES}"
+    for rejudge_root in "${rejudge_roots[@]}"; do
+        args+=(--bind "${rejudge_root}:${rejudge_root}:ro")
+    done
+fi
 
 exec "${runtime}" "${args[@]}" "${sif_path}" "$@"

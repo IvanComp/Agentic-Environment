@@ -464,6 +464,7 @@ def call_verifier(
     temperature: float,
     max_tokens: int,
     metadata: dict[str, Any],
+    actions: list[dict[str, Any]] | None = None,
 ) -> tuple[VerificationSignal, ModelCall]:
     prompt = f"""You are the {name} in a verification-oriented agentic architecture.
 Your verification scope is: {scope}.
@@ -474,7 +475,7 @@ Company sources (the same documents available to the agent that wrote the report
 
 Observed source access:
 {json.dumps(source_access, ensure_ascii=False)}
-
+{_render_actions(actions)}
 Candidate report:
 {report or '[no report produced]'}
 
@@ -506,13 +507,14 @@ def call_secondary_verifier(
     temperature: float,
     max_tokens: int,
     metadata: dict[str, Any],
+    actions: list[dict[str, Any]] | None = None,
 ) -> tuple[VerificationSignal, ModelCall]:
     prompt = f"""You are a secondary verifier. Primary verifiers assessed the same candidate under different scopes.
 Check whether their findings are supported by the company sources. Do not use majority vote: inspect the sources, each verifier's scope, and its stated findings. Decide whether the candidate can be committed or must be rejected.
 
 Company sources (the same documents available to the agent that wrote the report):
 {_render_sources(sources)}
-
+{_render_actions(actions)}
 Candidate report:
 {report or '[no report produced]'}
 
@@ -567,6 +569,13 @@ def _guidelines_in_listing(result: str) -> str:
 
 def _render_sources(sources: dict[str, str]) -> str:
     return "\n\n".join(f"=== {name} ===\n{content}" for name, content in sources.items())
+
+
+def _render_actions(actions: list[dict[str, Any]] | None) -> str:
+    if actions is None:
+        return ""
+    calls = [{"tool": entry.get("tool"), "arguments": entry.get("arguments") or {}} for entry in actions if entry.get("tool")]
+    return f"\nActions the agent took, in order (tool calls with arguments):\n{json.dumps(calls, ensure_ascii=False)}\n"
 
 
 def _claims_signal(name: str, scope: str, claims: ClaimSet, passed: bool) -> VerificationSignal:

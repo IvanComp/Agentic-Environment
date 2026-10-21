@@ -154,16 +154,20 @@ class ClaimSet:
 
 
 def _amount(text: str) -> float | None:
-    match = re.search(r"\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(million|mln|m\b|thousand|k\b)?", text, flags=re.I)
-    if not match:
-        return None
-    value = float(match.group(1).replace(",", ""))
-    unit = (match.group(2) or "").lower()
-    if unit in {"million", "mln", "m"}:
-        value *= 1_000_000
-    elif unit in {"thousand", "k"}:
-        value *= 1_000
-    return value
+    for match in re.finditer(r"(\$?)\s*(\d[\d,]*(?:\.\d+)?)\s*(million|mln|m\b|thousand|k\b)?", text, flags=re.I):
+        digits = match.group(2)
+        unit = (match.group(3) or "").lower()
+        if not match.group(1) and not unit and re.fullmatch(r"(?:19|20)\d\d", digits):
+            continue
+        if re.search(r"\bby\s*$", text[:match.start()]):
+            return None
+        value = float(digits.replace(",", ""))
+        if unit in {"million", "mln", "m"}:
+            value *= 1_000_000
+        elif unit in {"thousand", "k"}:
+            value *= 1_000
+        return value
+    return None
 
 
 ANNUAL_QUALIFIERS = ("total", "annual", "year", "overall", "cumulative", "fy")
@@ -173,18 +177,16 @@ def _stated_total(report: str, keywords: tuple[str, ...], *, needs_qualifier: bo
     pattern = re.compile(r"\b(?:" + "|".join(re.escape(keyword) for keyword in keywords) + r")\b")
     for line in report.splitlines():
         lowered = line.lower()
-        if "|" in line:
-            continue
-        match = pattern.search(lowered)
-        if not match or any(month in lowered for month in MONTHS):
+        if "|" in line or any(month in lowered for month in MONTHS) or re.search(r"\bq[1-4]\b|quarter", lowered):
             continue
         if needs_qualifier and not any(re.search(rf"\b{word}\b", lowered) for word in ANNUAL_QUALIFIERS):
             continue
-        value = _amount(lowered[match.end():])
-        if value is None or value < 1000:
-            continue
-        negative = bool(re.search(r"-\s*\$?\s*\d|\(\$?\d|\bloss\b|\bdeficit\b", lowered))
-        return value, negative
+        for match in pattern.finditer(lowered):
+            value = _amount(lowered[match.end():match.end() + 30])
+            if value is None or value < 1000:
+                continue
+            negative = bool(re.search(r"-\s*\$?\s*\d|\(\$?\d|\bloss\b|\bdeficit\b", lowered))
+            return value, negative
     return None
 
 
@@ -203,6 +205,8 @@ def _markdown_financial_totals(report: str) -> dict[str, tuple[float, bool]]:
         if "|" not in line:
             continue
         headers = [cell.strip().lower() for cell in line.strip().strip("|").split("|")]
+        if any(re.search(r"\d", header) for header in headers):
+            continue
         columns = {
             name: next(
                 (position for position, header in enumerate(headers) if any(alias in header for alias in names)),
