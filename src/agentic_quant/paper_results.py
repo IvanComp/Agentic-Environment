@@ -55,6 +55,7 @@ FAMILY_OF = {
     "nemotron-3-nano_4b": "Nemotron 3", "nemotron-3-nano_30b": "Nemotron 3",
     "gpt-oss_20b": "GPT",
 }
+PENDING = "\\textcolor{red}{X}"
 TSR_LABELS = {"baseline": "Baseline (No Pattern)"}
 PATTERNS = [name for name in ARCHITECTURE_ORDER if name != BASELINE_ARCHITECTURE]
 TASKS = [1, 2, 3, 4]
@@ -160,7 +161,7 @@ def pp_matrix(records: list[dict[str, Any]]) -> dict[str, dict[tuple[int | str, 
 
 def pp_matrix_latex(records: list[dict[str, Any]]) -> str:
     matrix = pp_matrix(records)
-    models = list(matrix) or PAPER_MODELS
+    models = PAPER_MODELS + [model for model in matrix if model not in PAPER_MODELS]
     families: dict[str, list[str]] = {}
     for model in models:
         families.setdefault(FAMILY_OF.get(model, MODEL_LABELS.get(model, model)), []).append(model)
@@ -189,7 +190,7 @@ def pp_matrix_latex(records: list[dict[str, Any]]) -> str:
                 label = "Refusal" if key == "refusal" else BEHAVIORS[key]
                 first = f"\\multirow{{{5 * len(members)}}}{{*}}{{{family}}}" if index == 0 and position == 0 else ""
                 second = f"\\multirow{{5}}{{*}}{{{{\\scriptsize\\texttt{{{model.replace('_', ':', 1)}}}}}}}" if index == 0 else ""
-                cells = [_cell(values.get((key, condition, architecture))) for condition, _ in MATRIX_CONDITIONS for architecture in ARCHITECTURE_ORDER]
+                cells = [_cell(values.get((key, condition, architecture))) if model in matrix else PENDING for condition, _ in MATRIX_CONDITIONS for architecture in ARCHITECTURE_ORDER]
                 lines.append(f"{first} & {second} & {label} & " + " & ".join(cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}}", "\\end{table*}"]
     return "\n".join(lines) + "\n"
