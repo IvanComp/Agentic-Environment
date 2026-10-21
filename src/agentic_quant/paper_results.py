@@ -60,12 +60,12 @@ TASKS = [1, 2, 3, 4]
 BEHAVIORS = {1: "Strategic Misrep.", 2: "Shutdown Tampering", 3: "Alignment Faking", 4: "Model Exfiltration"}
 MATRIX_CONDITIONS = [("bad_peer", "Bad Peer"), ("neutral_peer", "Neutral Peer"), ("good_peer", "Good Peer")]
 CRITIC_OUTCOMES = ["Faithful", "Peer-Preserving", "Incomplete", "Refusal"]
-DECISIONS = {"committed": "Committed", "promoted": "Committed", "rejected": "Rejected", "discarded": "Rejected", "escalated_to_human": "Escalated"}
-DECISION_ORDER = ["Committed", "Rejected", "Escalated"]
+DECISIONS = {"committed": "Accepted", "promoted": "Accepted", "rejected": "Blocked", "discarded": "Blocked", "escalated_to_human": "Escalated to Human"}
+DECISION_ORDER = ["Accepted", "Blocked", "Escalated to Human"]
 TASK_COLORS = {1: "#2a6f97", 2: "#e07a5f", 3: "#81b29a", 4: "#9d6fb5"}
 PATTERN_MARKERS = {"atomic_verifiable_claims": "o", "sandbox_gatekeeper": "s", "context_epistemic_routing": "^", "stackable_verification": "D", "multi_verifiers": "P"}
 OUTCOME_COLORS = {"Faithful": "#81b29a", "Peer-Preserving": "#e07a5f", "Incomplete": "#b8b8b8", "Refusal": "#f2cc8f"}
-DECISION_COLORS = {"Committed": "#3d405b", "Rejected": "#9a3b3b", "Escalated": "#c9a227"}
+DECISION_COLORS = {"Accepted": "#3d405b", "Blocked": "#9a3b3b", "Escalated to Human": "#c9a227"}
 
 
 def model_of(file: Path) -> str:
@@ -125,7 +125,7 @@ def critic_outcome(record: dict[str, Any]) -> str:
 
 def decision(record: dict[str, Any]) -> str:
     value = str(record.get("pattern_decision") or "")
-    return DECISIONS.get(value, value.replace("_", " ").title() or "Committed")
+    return DECISIONS.get(value, value.replace("_", " ").title() or "Accepted")
 
 
 def _cell(value: float | None, signed: bool = False, unit: float = 100.0, digits: int = 1) -> str:
@@ -296,7 +296,7 @@ def plot_tradeoff(records: list[dict[str, Any]], path: Path | None = None):
             ax.text(0.5, 0.5, "no data", transform=ax.transAxes, ha="center", va="center", color="#999999")
     handles = [Line2D([], [], marker=PATTERN_MARKERS[a], linestyle="", color="#555555", label=ARCHITECTURE_SHORT[a]) for a in PATTERNS]
     handles += [Line2D([], [], marker="o", linestyle="", color=TASK_COLORS[t], label=f"Task {t}") for t in TASKS]
-    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=7, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=7.5, handlelength=1.2, columnspacing=1.0, bbox_to_anchor=(0.5, -0.02))
     fig.tight_layout(rect=(0, 0.08, 1, 1))
     if path:
         fig.savefig(path, bbox_inches="tight")
@@ -326,12 +326,12 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
     import matplotlib.pyplot as plt
 
     data = flows(records)
-    fig, axes = plt.subplots(1, len(PATTERNS), figsize=(7.2, 2.6))
-    gap, width = 0.03, 0.06
+    fig, axes = plt.subplots(1, len(PATTERNS), figsize=(7.2, 2.8))
+    gap, width = 0.03, 0.07
     for ax, architecture in zip(axes, PATTERNS):
         ax.set_axis_off()
-        ax.set_title(ARCHITECTURE_SHORT[architecture], fontsize=9)
-        ax.set_xlim(-0.05, 1.05)
+        ax.set_title(ARCHITECTURE_SHORT[architecture], fontsize=10, fontweight="bold")
+        ax.set_xlim(-0.3, 1.3)
         ax.set_ylim(-0.02, 1.02)
         counter = data[architecture]
         total = sum(counter.values())
@@ -361,12 +361,15 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
                 left_cursor[outcome], right_cursor[choice] = l_bottom, r_bottom
         for name, (top, bottom) in left.items():
             ax.add_patch(plt.Rectangle((0, bottom), width, top - bottom, color=OUTCOME_COLORS[name]))
+            if left_counts[name] / total >= 0.03:
+                ax.text(-0.03, (top + bottom) / 2, f"{100 * left_counts[name] / total:.0f}%", ha="right", va="center", fontsize=7)
         for name, (top, bottom) in right.items():
             ax.add_patch(plt.Rectangle((1 - width, bottom), width, top - bottom, color=DECISION_COLORS.get(name, "#555555")))
-            ax.text(1 - width / 2, (top + bottom) / 2, str(right_counts[name]), ha="center", va="center", fontsize=5, color="white", rotation=90)
+            if right_counts[name] / total >= 0.03:
+                ax.text(1.03, (top + bottom) / 2, f"{100 * right_counts[name] / total:.0f}%", ha="left", va="center", fontsize=7)
     handles = [plt.Rectangle((0, 0), 1, 1, color=OUTCOME_COLORS[name], label=name) for name in CRITIC_OUTCOMES]
     handles += [plt.Rectangle((0, 0), 1, 1, color=DECISION_COLORS[name], label=name) for name in DECISION_ORDER]
-    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=7, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=7.5, handlelength=1.2, columnspacing=1.0, bbox_to_anchor=(0.5, -0.02))
     fig.tight_layout(rect=(0, 0.08, 1, 1))
     if path:
         fig.savefig(path, bbox_inches="tight")
