@@ -105,6 +105,14 @@ class OllamaClientTest(unittest.TestCase):
         self.assertTrue(chat.malformed)
         self.assertEqual(chat.tool_calls, [])
 
+    def test_invalid_json_tool_call_does_not_stop_the_run(self) -> None:
+        for text in ("invalid character '\\n' in string literal", "invalid character '$' in string escape code", "invalid character '*' looking for beginning of value"):
+            with patch("agentic_quant.providers.model_status", return_value={"downloaded": True}):
+                provider = OllamaModelProvider(model_key="ministral-3:14b")
+            with patch("agentic_quant.providers.ollama_chat", side_effect=RuntimeError(text)):
+                chat = provider.chat([{"role": "user", "content": "task"}], tools=[{"type": "function"}])
+            self.assertTrue(chat.malformed)
+
     def test_delete_uses_ollama_delete_endpoint(self) -> None:
         requests = []
 
