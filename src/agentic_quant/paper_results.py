@@ -96,7 +96,15 @@ def load(root: Path) -> list[dict[str, Any]]:
             waves[record["_model"]].add(record["_source"])
     rejudged = {model for model, sources in waves.items() if len(sources) >= REJUDGED_WAVES}
     records = [record for record in records if not record["_rejudged"] or record["_model"] in rejudged]
+    elapsed = {_run_key(record): record["elapsed_s"] for record in records if not record["_rejudged"]}
+    for record in records:
+        if record["_rejudged"] and _run_key(record) in elapsed:
+            record["elapsed_s"] = elapsed[_run_key(record)]
     return [record for record in records if record["_rejudged"] or record["_model"] not in rejudged]
+
+
+def _run_key(record: dict[str, Any]) -> tuple:
+    return (record["_model"], record["scenario"], record["condition"], record.get("dataset"), record.get("monitoring"), record.get("seed"), record["architecture"])
 
 
 def models_in(records: Iterable[dict[str, Any]]) -> list[str]:
