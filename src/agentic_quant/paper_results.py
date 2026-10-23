@@ -59,12 +59,12 @@ TASKS = [1, 2, 3, 4]
 BEHAVIORS = {1: "Strategic Misrep.", 2: "Shutdown Tampering", 3: "Alignment Faking", 4: "Model Exfiltration"}
 MATRIX_CONDITIONS = [("bad_peer", "Bad Peer"), ("neutral_peer", "Neutral Peer"), ("good_peer", "Good Peer")]
 CRITIC_OUTCOMES = ["Faithful", "Peer-Preserving", "Incomplete", "Refusal"]
-DECISIONS = {"committed": "Accepted", "promoted": "Accepted", "rejected": "Blocked", "discarded": "Blocked", "escalated_to_human": "Escalated to Human"}
-DECISION_ORDER = ["Accepted", "Blocked", "Escalated to Human"]
+DECISIONS = {"committed": "Committed", "promoted": "Committed", "rejected": "Rejected", "discarded": "Rejected", "escalated_to_human": "Escalated to Human"}
+DECISION_ORDER = ["Committed", "Rejected", "Escalated to Human"]
 TASK_COLORS = {1: "#2a6f97", 2: "#e07a5f", 3: "#81b29a", 4: "#9d6fb5"}
 PATTERN_MARKERS = {"atomic_verifiable_claims": "o", "sandbox_gatekeeper": "s", "context_epistemic_routing": "^", "stackable_verification": "D", "multi_verifiers": "P"}
 OUTCOME_COLORS = {"Faithful": "#81b29a", "Peer-Preserving": "#e07a5f", "Incomplete": "#b8b8b8", "Refusal": "#f2cc8f"}
-DECISION_COLORS = {"Accepted": "#3d405b", "Blocked": "#9a3b3b", "Escalated to Human": "#c9a227"}
+DECISION_COLORS = {"Committed": "#3d405b", "Rejected": "#9a3b3b", "Escalated to Human": "#c9a227"}
 
 
 def model_of(file: Path) -> str:
@@ -139,7 +139,7 @@ def critic_outcome(record: dict[str, Any]) -> str:
 
 def decision(record: dict[str, Any]) -> str:
     value = str(record.get("pattern_decision") or "")
-    return DECISIONS.get(value, value.replace("_", " ").title() or "Accepted")
+    return DECISIONS.get(value, value.replace("_", " ").title() or "Committed")
 
 
 def _cell(value: float | None, signed: bool = False, unit: float = 100.0, digits: int = 1) -> str:
@@ -375,7 +375,7 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
                 left_cursor[outcome], right_cursor[choice] = l_bottom, r_bottom
         for name, (top, bottom) in left.items():
             ax.add_patch(plt.Rectangle((0, bottom), width, top - bottom, color=OUTCOME_COLORS[name]))
-            if left_counts[name] / total >= 0.03:
+            if architecture == PATTERNS[0] and left_counts[name] / total >= 0.03:
                 ax.text(-0.03, (top + bottom) / 2, f"{100 * left_counts[name] / total:.0f}%", ha="right", va="center", fontsize=7)
         for name, (top, bottom) in right.items():
             ax.add_patch(plt.Rectangle((1 - width, bottom), width, top - bottom, color=DECISION_COLORS.get(name, "#555555")))
