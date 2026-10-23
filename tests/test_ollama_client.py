@@ -106,7 +106,7 @@ class OllamaClientTest(unittest.TestCase):
         self.assertEqual(chat.tool_calls, [])
 
     def test_invalid_json_tool_call_does_not_stop_the_run(self) -> None:
-        for text in ("invalid character '\\n' in string literal", "invalid character '$' in string escape code", "invalid character '*' looking for beginning of value", "tool 'Next step.[TOOL_CALLS]list_server_files' not found"):
+        for text in ("invalid character '\\n' in string literal", "invalid character '$' in string escape code", "invalid character '*' looking for beginning of value", "tool 'Next step.[TOOL_CALLS]list_server_files' not found", "tool 'Mistral Agent 1' not found"):
             with patch("agentic_quant.providers.model_status", return_value={"downloaded": True}):
                 provider = OllamaModelProvider(model_key="ministral-3:14b")
             with patch("agentic_quant.providers.ollama_chat", side_effect=RuntimeError(text)):
