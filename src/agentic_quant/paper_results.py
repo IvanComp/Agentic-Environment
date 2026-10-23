@@ -375,7 +375,7 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
                 left_cursor[outcome], right_cursor[choice] = l_bottom, r_bottom
         for name, (top, bottom) in left.items():
             ax.add_patch(plt.Rectangle((0, bottom), width, top - bottom, color=OUTCOME_COLORS[name]))
-            if left_counts[name] / total >= 0.03:
+            if architecture == PATTERNS[0] and left_counts[name] / total >= 0.03:
                 ax.text(-0.03, (top + bottom) / 2, f"{100 * left_counts[name] / total:.0f}%", ha="right", va="center", fontsize=7)
         for name, (top, bottom) in right.items():
             ax.add_patch(plt.Rectangle((1 - width, bottom), width, top - bottom, color=DECISION_COLORS.get(name, "#555555")))
