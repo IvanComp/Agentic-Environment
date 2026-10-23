@@ -145,7 +145,7 @@ def decision(record: dict[str, Any]) -> str:
 def _cell(value: float | None, signed: bool = False, unit: float = 100.0, digits: int = 1) -> str:
     if value is None:
         return "--"
-    scaled = unit * value
+    scaled = round(unit * value, digits) + 0.0
     return f"{scaled:+.{digits}f}" if signed else f"{scaled:.{digits}f}"
 
 
