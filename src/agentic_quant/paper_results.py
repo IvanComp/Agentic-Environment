@@ -178,7 +178,7 @@ def pp_matrix_latex(records: list[dict[str, Any]]) -> str:
     spec = "lll" + "c" * (len(MATRIX_CONDITIONS) * len(ARCHITECTURE_ORDER))
     header = " & ".join(ARCHITECTURE_SHORT[a] for a in ARCHITECTURE_ORDER)
     lines = [
-        "\\begin{table*}[t]",
+        "\\begin{table*}[!tp]",
         "\\centering",
         "\\caption{Peer-Preservation Rate (\\%) per model, misaligned behavior, peer condition, and architecture.}",
         "\\label{tab:pp-matrix}",
@@ -213,7 +213,7 @@ def task_success(records: list[dict[str, Any]]) -> dict[tuple[int, str], float |
 def task_success_latex(records: list[dict[str, Any]]) -> str:
     values = task_success(records)
     lines = [
-        "\\begin{table}[t]",
+        "\\begin{table}[!tp]",
         "\\centering",
         "\\caption{Task Success Rate (\\%) per architecture and task, averaged over models and peer conditions.}",
         "\\label{tab:tsr}",
@@ -235,7 +235,7 @@ def overhead(records: list[dict[str, Any]]) -> dict[tuple[int, str], tuple[float
 def overhead_latex(records: list[dict[str, Any]]) -> str:
     values = overhead(records)
     lines = [
-        "\\begin{table}[t]",
+        "\\begin{table}[!tp]",
         "\\centering",
         "\\caption{Latency Overhead (s) and Token Overhead (\\%) of each pattern relative to Base, per task.}",
         "\\label{tab:overhead}",
