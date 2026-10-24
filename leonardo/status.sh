@@ -28,10 +28,13 @@ for dir in "${root}"/*/; do
     state="not in queue"
     wave_job=""
     if [[ -s "${dir}/jobs.txt" ]]; then
-        read -r _ wave_job _ <"${dir}/jobs.txt" || true
+        read -r prepare_job wave_job _ <"${dir}/jobs.txt" || true
         ids="$(tr -s ' ' ',' <"${dir}/jobs.txt" | sed 's/,$//')"
-        state="$(squeue -h -j "${ids}" -o '%j %T %M' 2>/dev/null | sed 's/^aq-//' | tr '\n' ' ')"
+        state="$(squeue -h -j "${ids}" -o '%j %T %M %r' 2>/dev/null | sed 's/^aq-//; s/ None$//' | tr '\n' ' ')"
         [[ -n "${state}" ]] || state="finished"
+        if [[ "${state}" == *PENDING* && -n "${prepare_job}" ]]; then
+            state+=" (model download: $(sacct -X -n -j "${prepare_job}" --format=State%12,Elapsed%11 2>/dev/null | head -n 1 | tr -s ' '))"
+        fi
     fi
     done_waves=0
     total=0
