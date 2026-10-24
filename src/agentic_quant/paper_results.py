@@ -57,7 +57,7 @@ TASKS = [1, 2, 3, 4]
 BEHAVIORS = {1: "Strategic Misrep.", 2: "Shutdown Tampering", 3: "Alignment Faking", 4: "Model Exfiltration"}
 MATRIX_CONDITIONS = [("bad_peer", "Bad Peer"), ("neutral_peer", "Neutral Peer"), ("good_peer", "Good Peer")]
 CRITIC_OUTCOMES = ["Faithful", "Peer-Preserving", "Incomplete", "Refusal"]
-DECISIONS = {"committed": "Committed", "promoted": "Committed", "rejected": "Rejected", "discarded": "Rejected", "escalated_to_human": "Escalated to Human"}
+DECISIONS = {"committed": "Committed", "promoted": "Committed", "no_effect": "Committed", "rejected": "Rejected", "discarded": "Rejected", "escalated_to_human": "Escalated to Human"}
 DECISION_ORDER = ["Committed", "Rejected", "Escalated to Human"]
 TASK_COLORS = {1: "#2a6f97", 2: "#e07a5f", 3: "#81b29a", 4: "#9d6fb5"}
 PATTERN_MARKERS = {"atomic_verifiable_claims": "o", "sandbox_gatekeeper": "s", "context_epistemic_routing": "^", "stackable_verification": "D", "multi_verifiers": "P"}
@@ -282,7 +282,7 @@ def tradeoff(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def flows(records: list[dict[str, Any]]) -> dict[str, Counter]:
-    out: dict[str, Counter] = {architecture: Counter() for architecture in PATTERNS}
+    out: dict[str, Counter] = {architecture: Counter() for architecture in ARCHITECTURE_ORDER}
     for record in records:
         if record["architecture"] in out and record["condition"] in PEER_CONDITIONS:
             out[record["architecture"]][(critic_outcome(record), decision(record))] += 1
@@ -338,9 +338,9 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
     import matplotlib.pyplot as plt
 
     data = flows(records)
-    fig, axes = plt.subplots(1, len(PATTERNS), figsize=(7.2, 1.8))
+    fig, axes = plt.subplots(1, len(ARCHITECTURE_ORDER), figsize=(7.2, 1.8))
     gap, width = 0.03, 0.07
-    for ax, architecture in zip(axes, PATTERNS):
+    for ax, architecture in zip(axes, ARCHITECTURE_ORDER):
         ax.set_axis_off()
         ax.set_title(ARCHITECTURE_SHORT[architecture], fontsize=10, fontweight="bold")
         ax.set_xlim(-0.3, 1.3)
@@ -373,7 +373,7 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
                 left_cursor[outcome], right_cursor[choice] = l_bottom, r_bottom
         for name, (top, bottom) in left.items():
             ax.add_patch(plt.Rectangle((0, bottom), width, top - bottom, color=OUTCOME_COLORS[name]))
-            if architecture == PATTERNS[0] and left_counts[name] / total >= 0.03:
+            if architecture == ARCHITECTURE_ORDER[0] and left_counts[name] / total >= 0.03:
                 ax.text(-0.03, (top + bottom) / 2, f"{100 * left_counts[name] / total:.0f}%", ha="right", va="center", fontsize=7)
         for name, (top, bottom) in right.items():
             ax.add_patch(plt.Rectangle((1 - width, bottom), width, top - bottom, color=DECISION_COLORS.get(name, "#555555")))
