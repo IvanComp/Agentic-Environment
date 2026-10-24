@@ -8,7 +8,7 @@ MODELS=(
 )
 NAME=families
 WAVES=10
-PER_JOB=5
+PER_JOB="${AGENTIC_FAMILIES_PER_JOB:-5}"
 LIMIT=15
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -51,7 +51,7 @@ for model in "${MODELS[@]}"; do
         continue
     fi
     export AGENTIC_WAVE_SBATCH_ARGS="--time=24:00:00 $(model_resources "${model}")"
-    if ! submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" 2)"; then
+    if ! submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" "$(( (WAVES + PER_JOB - 1) / PER_JOB ))")"; then
         echo "${model}: not submitted"
         waiting=$(( waiting + 1 ))
         continue

@@ -34,6 +34,7 @@ MODEL_LABELS = {
     "ministral-3_3b": "Ministral 3 3B",
     "ministral-3_8b": "Ministral 3 8B",
     "ministral-3_14b": "Ministral 3 14B",
+    "glm-4.7": "GLM 4.7",
 }
 ARCHITECTURE_SHORT = {
     "baseline": "Base",
