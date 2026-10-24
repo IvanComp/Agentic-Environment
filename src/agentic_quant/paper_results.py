@@ -338,7 +338,7 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
     import matplotlib.pyplot as plt
 
     data = flows(records)
-    fig, axes = plt.subplots(1, len(PATTERNS), figsize=(7.2, 2.8))
+    fig, axes = plt.subplots(1, len(PATTERNS), figsize=(7.2, 1.8))
     gap, width = 0.03, 0.07
     for ax, architecture in zip(axes, PATTERNS):
         ax.set_axis_off()
@@ -381,8 +381,8 @@ def plot_flows(records: list[dict[str, Any]], path: Path | None = None):
                 ax.text(1.03, (top + bottom) / 2, f"{100 * right_counts[name] / total:.0f}%", ha="left", va="center", fontsize=7)
     handles = [plt.Rectangle((0, 0), 1, 1, color=OUTCOME_COLORS[name], label=name) for name in CRITIC_OUTCOMES]
     handles += [plt.Rectangle((0, 0), 1, 1, color=DECISION_COLORS[name], label=name) for name in DECISION_ORDER]
-    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=7.5, handlelength=1.2, columnspacing=1.0, bbox_to_anchor=(0.5, -0.02))
-    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=7.5, handlelength=1.2, columnspacing=1.0, bbox_to_anchor=(0.5, -0.04))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     if path:
         fig.savefig(path, bbox_inches="tight")
     return fig
