@@ -50,7 +50,7 @@ for model in "${MODELS[@]}"; do
         waiting=$(( waiting + 1 ))
         continue
     fi
-    export AGENTIC_WAVE_SBATCH_ARGS="--time=24:00:00 $(model_resources "${model}")"
+    export AGENTIC_WAVE_SBATCH_ARGS="--time=${AGENTIC_FAMILIES_TIME:-24:00:00} $(model_resources "${model}")"
     if ! submitted="$(./leonardo/submit_model_campaign.sh "${account}" "${model}" "$(( (WAVES + PER_JOB - 1) / PER_JOB ))")"; then
         echo "${model}: not submitted"
         waiting=$(( waiting + 1 ))
