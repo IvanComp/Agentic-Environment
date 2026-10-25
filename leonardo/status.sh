@@ -34,6 +34,8 @@ for dir in "${root}"/*/; do
         [[ -n "${state}" ]] || state="finished"
         if [[ "${state}" == *PENDING* && -n "${prepare_job}" ]]; then
             state+=" (model download: $(sacct -X -n -j "${prepare_job}" --format=State%12,Elapsed%11 2>/dev/null | head -n 1 | tr -s ' '))"
+            start_at="$(squeue -h -j "${wave_job}" --start -o '%S' 2>/dev/null | grep -v N/A | sort | head -n 1 || true)"
+            [[ -z "${start_at}" ]] || state+=" (expected start: ${start_at})"
         fi
     fi
     done_waves=0
