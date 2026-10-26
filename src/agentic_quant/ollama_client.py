@@ -24,8 +24,9 @@ def ollama_models(*, timeout: float = 3) -> list[dict[str, Any]]:
 
 
 def ollama_model_info(model: str, *, timeout: float = 3) -> dict[str, Any] | None:
+    names = {model} if ":" in model else {model, f"{model}:latest"}
     for item in ollama_models(timeout=timeout):
-        if item.get("model") == model or item.get("name") == model:
+        if item.get("model") in names or item.get("name") in names:
             return item
     return None
 
