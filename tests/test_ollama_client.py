@@ -136,6 +136,13 @@ class OllamaClientTest(unittest.TestCase):
         self.assertFalse(status["downloaded"])
         self.assertIn("timed out", status["error"])
 
+    def test_untagged_model_matches_latest_tag(self) -> None:
+        with patch("agentic_quant.ollama_client.ollama_models", return_value=[{"name": "glm-4.7-flash:latest", "size": 5}]):
+            status = model_status("glm-4.7-flash")
+
+        self.assertTrue(status["downloaded"])
+
+
 
 if __name__ == "__main__":
     unittest.main()
